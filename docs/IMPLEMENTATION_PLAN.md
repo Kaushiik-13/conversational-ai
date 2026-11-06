@@ -175,6 +175,76 @@ Ingest an approved sample of automotive manuals/service documents with organizat
 
 Return concise answers grounded in structured rows and/or cited passages, with tables/cards and optional simple charts. Explain empty results, ambiguity, validation failures, malformed workbooks and model outages. Maintain a small golden set of automotive questions with expected Cube Query meaning, access outcome and result shape. Support dry-plan/validation and bounded repair or clarification; never silently broaden access or alter a metric.
 
+## Detailed engineering decisions from the learning notes
+
+### Separate proposal, meaning, SQL safety, and execution
+
+The LLM proposes intent and Cube Query JSON; trusted backend components own all consequential decisions. Treat correctness as several separate questions:
+
+| Check | What it establishes | Example failure |
+|---|---|---|
+| Contract correctness | The JSON has the expected structure and supported operators | Unknown property or invalid filter type |
+| Semantic correctness | The request maps to the intended business definitions, relationships, and grain | “Manufacturer” could mean the part maker or vehicle brand |
+| SQL structure/safety | QGen produced only allowed, parameterized, read-only SQL over modeled objects | A write statement or unapproved function/table |
+| Authorization | The signed-in actor may read the requested semantic fields and rows | An organization boundary is crossed |
+| Result correctness | The executed query computes the expected metric over the correct scope | A compatibility join counts the same part several times |
+| Answer faithfulness | The summary says only what the returned rows and evidence support | Inferring inventory availability from catalog presence |
+
+Passing one check does not imply passing the others. SQL parsing/AST inspection is useful but is not a replacement for building queries from approved operations, database privileges, row policies, limits, and result-level evaluation.
+
+### Build in a deterministic-first order
+
+The first engineering proof should not start with prompt tuning. Recommended implementation sequence:
+
+1. Inspect real schema, keys, cardinality, roles, RLS, policies, and existing APIs (read-only).
+2. Define the small automotive semantic model and a versioned Cube Query JSON contract.
+3. Hand-author a few valid Cube Query examples and expected results.
+4. Implement semantic validation, deterministic QGen, parameter binding, and a protected read-only executor.
+5. Compare output with independently written reference SQL, including authorization and join-grain cases.
+6. Only then ask the local LLM to propose Cube Query JSON; invalid proposals must be clarified or rejected.
+7. Add structured conversation state, visual results, Excel/DuckDB, and RAG in separately approved stages.
+
+Our Cube Query is our own contract. It is not ThoughtSpot AgentQL, Wren MDL, Wren's cube API, or raw SQL. If Wren is evaluated as an engine, place it behind an adapter and test its actual API/version, query syntax, dialect output, correctness, licensing, runtime footprint, and tenancy compatibility before adoption. Keep a go/no-go record; do not assume Wren's commercial authorization features are present in OSS core.
+
+### Automotive semantic modeling and join grain
+
+Use domain terms with explicit meaning. “Manufacturer” may mean component manufacturer or vehicle brand; ask when context cannot disambiguate. “Available parts” needs an approved definition (for example active status plus organization scope); catalog presence alone does not prove inventory availability.
+
+The Parts → Compatibility → Vehicles relationship is likely one-to-many or many-to-many, but its actual cardinality must be verified. When asking for unique catalog parts by manufacturer or vehicle, define a distinct-part measure at the correct grain. Test multi-compatible parts so a join cannot inflate counts. Do not assume foreign keys alone define approved business join paths.
+
+### Tenant-safe PostgreSQL execution and recovery
+
+Use least-privileged read-only credentials and enforce permissions in the application and database where possible. Test RLS using a runtime role that cannot bypass it. Establish tenant context transaction-locally for each operation; never trust a pooled connection's previous session state. Apply statement timeout, row/result limits, and concurrency limits. Roll back failed transactions before connection reuse, and discard unhealthy connections. Errors/logs must not disclose another tenant's rows or sensitive SQL values.
+
+### Follow-up state is structured
+
+Keep a validated analytical state (last accepted Cube Query, selected metrics/dimensions, filters, sort, source and relevant history), not only the transcript. A follow-up can propose one of four operations:
+
+| Operation | Example | State effect |
+|---|---|---|
+| Replace | “What about Honda?” | Replace vehicle-brand filter, retain other filters |
+| Add | “Only active parts” | Add an approved active-parts filter |
+| Remove | “Include every category” | Remove the category filter |
+| Reset | “Start a new analysis” | Clear the current analytical state |
+
+Every proposed change is validated and reauthorized. If it could refer to multiple fields or metrics, ask a clarification. Start without long-term AI memory; add tenant-scoped approved examples only when their governance and retention are defined.
+
+### Typed results, visualizations, and provenance
+
+The API should return typed columns/rows, a grounded summary, a validated visualization specification, and provenance such as semantic-model version, metric definition, filters, query identifier, source, and whether displayed rows are truncated. Choose basic KPI/table/bar/line displays deterministically from result shape; fall back to a table when uncertain. Distinguish pagination from an aggregate calculated on incomplete data. Explain NULL, empty results, sampled/truncated outputs, and errors accurately. Never invent causes or trends from descriptive summaries.
+
+### Product validation and differentiation
+
+ThoughtSpot is a product-behavior reference (guided use-case context, editable/inspectable interpretation, follow-ups, visual answers, and human-reviewed feedback). Wren is an open-source architecture/reuse candidate. Neither is evidence that our product has a differentiator yet. Record product claims as documented facts, version-specific observations, or hypotheses; verify bug reports and licenses before using them to make decisions.
+
+Our proposed differentiators to validate with users are reliable multi-turn context, transparent interpretation and provenance, tenant-aware governance, guided semantic setup, and clear data-coverage indicators. Measure answer correctness, join/metric correctness, unauthorized leakage, how often a wrong interpretation is caught before execution, correction time, follow-up state retention, and time to first trustworthy answer.
+
+### Source notes
+
+- [Conversational AI — Learning Notes](https://app.notion.com/p/Conversational-AI-Learning-Notes-405c16ecc9ae817f8cd5e1dd382b70ed?pvs=21)
+- [Reference — ThoughtSpot Spotter Product Research](https://app.notion.com/p/Reference-ThoughtSpot-Spotter-Product-Research-405c16ecc9ae812096cfd7f84565d954?pvs=21)
+- [Reference — Wren AI Architecture Research](https://app.notion.com/p/Reference-Wren-AI-Architecture-Research-405c16ecc9ae81de95d8c7ee66a07879?pvs=21)
+
 ## Proposed project structure
 
 Extend the existing Angular/NestJS/PostgreSQL monorepo. Do not duplicate identity, database, or authorization. Adapt exact paths after read-only inspection.
