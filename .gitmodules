@@ -1,0 +1,3 @@
+[submodule "automotive-search"]
+	path = automotive-search
+	url = https://github.com/Kaushiik-13/automotive-search.git

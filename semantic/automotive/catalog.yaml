@@ -1,0 +1,140 @@
+version: 1
+model: automotive_catalog
+description: >-
+  Read-only analytics model for catalog parts. This file is a reviewed semantic
+  definition; it does not execute queries or establish authorization.
+
+source:
+  engine: postgresql
+  schema: catalog
+  table: part_catalog
+  alias: part
+  grain: one row per catalog part
+
+authorization:
+  organization_context: authenticated_server_session
+  enforcement: existing_database_row_level_security
+  require_permission: catalog.read
+  never_accept_organization_from_question: true
+  never_expose_as_query_fields:
+    - id
+    - company_id
+    - tenant_id
+    - security_domain_id
+    - visibility_status
+    - source_system
+    - source_record_id
+
+measures:
+  part_count:
+    description: Number of distinct catalog parts visible to the authenticated user.
+    aggregation: count_distinct
+    expression: part.id
+
+dimensions:
+  manufacturer:
+    description: Component manufacturer recorded on the catalog part.
+    expression: part.manufacturer
+    type: string
+    groupable: true
+    filterable: true
+  commodity:
+    description: Top-level commodity classification.
+    expression: part.commodity
+    type: string
+    groupable: true
+    filterable: true
+  sub_commodity:
+    description: More specific commodity classification.
+    expression: part.sub_commodity
+    type: string
+    groupable: true
+    filterable: true
+  vehicle_program:
+    description: Vehicle program associated with the part; this is not a vehicle make.
+    expression: part.vehicle_program
+    type: string
+    groupable: true
+    filterable: true
+  region:
+    description: Region associated with the part record.
+    expression: part.region
+    type: string
+    groupable: true
+    filterable: true
+  country:
+    description: Country associated with the part record.
+    expression: part.country
+    type: string
+    groupable: true
+    filterable: true
+  plant:
+    description: Plant associated with the part record.
+    expression: part.plant
+    type: string
+    groupable: true
+    filterable: true
+  model_year:
+    description: Model year associated with the part record.
+    expression: part.model_year
+    type: integer
+    groupable: true
+    filterable: true
+  lifecycle_status:
+    description: Lifecycle status recorded on the part.
+    expression: part.lifecycle_status
+    type: string
+    groupable: true
+    filterable: true
+  active:
+    description: Whether the catalog record is active.
+    expression: part.active
+    type: boolean
+    groupable: true
+    filterable: true
+  category:
+    description: Catalog category assigned to the part.
+    expression: category.name
+    type: string
+    groupable: true
+    filterable: true
+    filter_expression: category.slug
+    filter_behavior: match_selected_category_and_descendants
+    join:
+      table: catalog.part_categories
+      alias: part_category
+      on: part_category.part_id = part.id
+      target_table: catalog.categories
+      target_alias: category
+      target_on: category.id = part_category.category_id
+      cardinality: many_to_many
+      measure_rule: count_distinct_part_id
+
+lookup_fields:
+  part_number:
+    expression: part.part_number
+    filterable: true
+    groupable: false
+  part_name:
+    expression: part.part_name
+    filterable: true
+    groupable: false
+
+excluded_fields:
+  - cost_usd
+  - supplier_status
+  - weight_kg
+  - description
+  - tenant_id
+  - company_id
+  - security_domain_id
+  - visibility_status
+  - source_system
+  - source_record_id
+
+limits:
+  max_dimensions_per_query: 3
+  max_filters_per_query: 10
+  default_result_limit: 50
+  max_result_limit: 500
+  read_only: true

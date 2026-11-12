@@ -33,7 +33,6 @@ The first PoC uses the automotive catalog to test these jobs. It is intended to 
 - “Among those results, group by vehicle model.”
 - “Which five manufacturers have the most unique Toyota-compatible braking parts?”
 - “Compare these two parts.”
-- “How many matching parts are there, and what does the service manual say about this category?”
 
 These are examples, not claims that every field or metric already exists. The actual semantic model and supported questions must be derived from the automotive database schema and approved business definitions.
 
@@ -48,14 +47,15 @@ These are examples, not claims that every field or metric already exists. The ac
 7. The answer layer presents a grounded explanation with records, table/chart, filters, provenance, and an inspectable trace.
 8. Follow-up questions modify the structured query state (replace/add/remove/reset filters) and go through validation and authorization again.
 
-For document questions, a separate RAG path retrieves authorized passages and returns citations. A hybrid question combines a structured calculation and document evidence without allowing retrieved text to silently change a metric definition.
+The current PoC handles structured PostgreSQL questions only. Document search,
+Excel/DuckDB, and hybrid questions are deferred and are not part of this build.
 
 ## Core product principles
 
 - **Business meaning is explicit:** models, measures, dimensions, synonyms, grain, and approved join paths live in a reviewable semantic layer.
 - **The LLM proposes; trusted code enforces:** authorization, SQL generation, query limits, execution, and evidence selection are backend responsibilities.
-- **Structured analytics is computed over the data:** RAG is for descriptive knowledge; it is not a substitute for counts, averages, or other complete calculations.
-- **Answers are inspectable:** show the interpreted query, metric meaning, filters, source evidence, and data-coverage status where the user's role permits.
+- **Structured analytics is computed over the data:** counts and groupings are computed over authorized PostgreSQL rows.
+- **Answers are inspectable:** show the interpreted query, metric meaning, filters, and result provenance where the user's role permits.
 - **Conversation state is explicit:** follow-ups carry forward validated query state, not just conversational text.
 - **Tenant boundaries are mandatory:** a prompt, model response, filter, or conversation ID cannot select another organization's data.
 - **Feedback is reviewed:** user corrections inform evaluation and potential semantic updates; they do not automatically become trusted policy.
@@ -63,35 +63,35 @@ For document questions, a separate RAG path retrieves authorized passages and re
 
 ## PoC definition
 
-The proof of concept should demonstrate three architectural properties:
+The proof of concept should demonstrate one end-to-end structured analytics path:
 
-1. A PostgreSQL automotive analytical question runs through the semantic model, Cube Query, validation, QGen, and the protected database adapter.
-2. A bounded Excel workbook is normalized with DuckDB and queried using the same Cube Query meaning.
-3. A hybrid automotive question combines a structured result with a cited passage from an approved sample document.
+1. An automotive question runs through the semantic model, Cube Query, validation, QGen, organization/role checks, and the protected PostgreSQL adapter.
 
-PoC success also requires a working conversational UI, follow-up state, organization/role isolation, clear unsupported/ambiguous cases, and local Docker Compose startup. This is a feasibility demonstration; broad Excel compatibility, extensive charts, advanced forecasting, and production-scale operations are later work.
+PoC success also requires a working conversational UI, follow-up state,
+organization/role isolation, clear unsupported/ambiguous cases, and local Docker
+Compose startup. Excel/DuckDB, RAG, document ingestion, and hybrid questions
+are explicitly deferred.
 
 ## What makes the product valuable
 
 The intended value is not simply “chat over a database.” The product should make analytical exploration more accessible while making errors and permissions easier to understand:
 
 - Reduce the need to translate every question into SQL or dashboard filters.
-- Reuse approved business definitions across conversations and data sources.
+- Reuse approved business definitions across conversational queries.
 - Let a user correct a filter or grouping through a follow-up and see what changed.
 - Catch ambiguity, unsupported calculations, or invalid relationships before execution.
 - Show when an answer is based on incomplete, truncated, or missing data.
-- Keep analytical answers and documentary explanations grounded in different evidence types.
 
 These benefits are hypotheses to validate with users. The project should not claim superiority over ThoughtSpot or Wren without measured comparisons.
 
 ## First-version boundaries
 
 - Read-only analytics; chat does not create, update, or delete catalog records.
-- PostgreSQL is the primary source, with a small Excel/DuckDB portability demonstration.
+- PostgreSQL is the only data source in the current PoC.
 - A limited set of approved automotive entities, measures, dimensions, and join paths.
 - One local model runtime, selected after checking host resources.
-- One bounded set of sample documents for the hybrid RAG demonstration.
 - Session-level conversation state initially unless durable history is approved.
+- Excel/DuckDB, document ingestion, RAG, and hybrid answers are deferred until separately approved.
 - No arbitrary model-written SQL, cloud model fallback, public deployment, or unrestricted workbook ingestion.
 
 ## How we will decide whether it is feasible

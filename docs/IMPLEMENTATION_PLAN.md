@@ -5,6 +5,55 @@
 **Foundation:** [automotive-search](https://github.com/Kaushiik-13/automotive-search)  
 **Approval rule:** No application-code changes until you approve the plan and the specific change set for each stage.
 
+## Current decisions — 2026-11-12
+
+- Build the PoC with open-source tools and run the language model locally. No
+  cloud LLM or paid model API fallback.
+- Keep the existing Angular/NestJS application, automotive PostgreSQL data,
+  authentication, organization roles, and row-level security as the foundation.
+- Use the project-owned Cube Query JSON contract and QGen. Model output remains
+  a proposal that is validated and compiled by backend code; it never supplies
+  SQL, organization IDs, or role choices.
+- Prefer Ollama as the local model runtime. Choose the exact model only after
+  checking machine resources and that model's own license.
+- Exclude Excel/DuckDB and RAG/document retrieval from the current PoC. They are
+  deferred and require a separate scope decision before any work begins.
+- Keep cost, supplier status, weight, and source-tracking fields outside the
+  conversational semantic model for the initial PoC.
+
+### Open-source components and license notes
+
+| Area | PoC choice | License / boundary |
+|---|---|---|
+| Database | Existing PostgreSQL with ParadeDB | PostgreSQL uses its permissive PostgreSQL License. ParadeDB Community is AGPL-3.0; keep this visible when distributing or hosting the product. |
+| Local model runtime | Ollama, preferred | Ollama software is MIT-licensed. Model weights have separate terms and must be reviewed before selection. |
+| Semantic query | Project-owned Cube Query and QGen | Only approved semantic fields are exposed; all filters and limits are parameterized. |
+| Excel analytics | Deferred | DuckDB is a possible later choice; no Excel ingestion or DuckDB service is in this PoC. |
+| Document retrieval | Deferred | No RAG, embeddings, vector index, or document ingestion in this PoC. |
+| Packaging | Docker Compose | Local services and data stay on the development machine by default. |
+
+References: [PostgreSQL license](https://www.postgresql.org/about/licence/),
+[ParadeDB license](https://github.com/paradedb/paradedb/blob/main/LICENSE),
+[Ollama license](https://github.com/ollama/ollama/blob/master/LICENSE), and
+[Ollama local API](https://github.com/ollama/ollama/blob/main/docs/api/openai-compatibility.mdx).
+
+### Current implementation and test status
+
+- The automotive database contains five million generated rows on the D: drive.
+- The semantic model, Cube Query v1 schema, validator, and QGen prototype are
+  present locally. The Cube Query package has nine passing tests; authenticated
+  query checks passed for Org A, Org B, and the restricted Org B viewer.
+- Existing automotive-search validations for Phases 3, 4, 7, 8, and 9 pass.
+- Phases 5, 6, and 11 currently fail: Phase 5 has stale expectations for the
+  number of development accounts; Phases 6 and 11 find that the seed did not
+  populate expected field-access rules. These failures must be resolved before
+  pushing. Changes to the separate automotive-search source repo require your
+  approval first.
+- The authenticated `POST /api/v1/conversation/query` route is now integrated
+  with the existing session, `catalog.read` permission, protected database
+  context, audit event, validator, and QGen. The local-model natural-language
+  planner and chat UI are still not implemented.
+
 ## Goal and architecture
 
 Build a functional, Wren AI–inspired conversational analytics product for automotive data. A user asks in natural language; the system retrieves relevant business context, plans a governed query, validates it, executes it against an authorized source, and responds with evidence.
@@ -13,12 +62,12 @@ Build a functional, Wren AI–inspired conversational analytics product for auto
 Question → Intent Planner → Context Retrieval → Cube Query JSON
          → Semantic + Authorization Validation → QGen / Query Planner
          → Data Source Adapter → Results → Grounded Answer and trace
-
-Document question → Intent Planner → RAG retrieval → cited evidence
-Hybrid question → structured query path + RAG path → attributed combined answer
 ```
 
-This is more than an LLM connected to search. RAG is useful for descriptive text, but it cannot reliably calculate aggregates over rows. Structured analytics must use the semantic/query path. Retrieved documents cannot silently redefine metrics or formulas; business logic must be approved in the semantic model.
+The current PoC is structured PostgreSQL analytics only. The local model proposes
+Cube Query JSON; trusted backend code validates it, applies the authenticated
+organization context, and executes the bounded query through the protected
+database path.
 
 ### Proposed architecture diagram
 
@@ -40,19 +89,8 @@ flowchart LR
   VAL --> QGEN[QGen / query planner]
   QGEN --> DS{Data source adapter}
   DS --> PG[PostgreSQL / ParadeDB]
-  DS --> DUCK[DuckDB]
-  XLSX[Approved Excel workbook] --> INGEST[Workbook inspection and ingestion]
-  INGEST --> DUCK
-
-  ROUTE -->|Document question| RET[Org-scoped document retrieval]
-  DOCS[(Approved automotive manuals)] --> RET
-  ROUTE -->|Hybrid question| RET
-  RET --> EVIDENCE[Cited document evidence]
-
   PG --> RESULTS[Authorized structured results]
-  DUCK --> RESULTS
   RESULTS --> ANSWER[Grounded answer + table/chart + trace]
-  EVIDENCE --> ANSWER
   ANSWER --> UI
 
   subgraph DOCKER[Local Docker Compose environment]
@@ -65,9 +103,6 @@ flowchart LR
     QGEN
     DS
     PG
-    DUCK
-    INGEST
-    RET
   end
 ```
 
@@ -100,40 +135,42 @@ We will not assume ThoughtSpot's internal BARQ/token-search engine or proprietar
 
 ## PoC scope
 
-The pasted notes recommend proving three scenarios; this plan includes all three in the automotive domain:
+The current PoC proves one end-to-end scenario in the automotive domain:
 
-1. **PostgreSQL analytics:** e.g. count or group catalog records by an approved automotive dimension.
-2. **Excel analytics:** load a bounded workbook through DuckDB and use the same Cube Query contract and semantic meaning.
-3. **Hybrid question:** calculate from structured automotive data and retrieve an explanation from an approved manual/service document; return both with evidence.
+1. **PostgreSQL analytics:** answer a supported count/group/filter question using the approved semantic model, Cube Query validation, QGen, and the existing protected PostgreSQL path.
 
-The existing automotive PostgreSQL database is the primary source. Excel/DuckDB demonstrates source portability, not universal Excel support. Exact questions, fields, and measures must be chosen from the actual schema during read-only assessment.
+The existing automotive PostgreSQL database is the only data source in this PoC. Excel/DuckDB and RAG are deferred. Exact questions, fields, and measures must be chosen from the actual schema and current row-level security policies.
 
-Use a local LLM only, with no cloud fallback. Ollama in Docker is a proposed runtime, not a locked choice; select the model after checking machine RAM/VRAM and response-time needs.
+Use a local LLM only, with no cloud fallback. Ollama is the preferred runtime;
+select the exact model after checking machine RAM/VRAM, response-time needs,
+structured-output behavior, and the model's license.
 
-Not in the first PoC unless separately approved: chat-driven catalog writes, arbitrary model-written SQL, public deployment, generic Excel support, or allowing document text to change formulas at query time.
+Outside the current PoC: chat-driven catalog writes, arbitrary model-written SQL, public deployment, Excel/DuckDB, document ingestion, RAG, and hybrid answers.
 
 ## Modules and responsibilities
 
 ### User interface
 
-Extend the Angular app with chat turns and follow-ups, automotive result cards/tables, optional charts for supported aggregations, loading/error states, citations, a query trace, and automotive-specific starter questions. Show interpreted measures/dimensions/filters and validation/execution status without exposing sensitive values. Start with session-scoped history unless durable saved history is approved. Feedback is captured for review, not automatically treated as truth.
+Extend the Angular app with chat turns and follow-ups, automotive result cards/tables, optional charts for supported aggregations, loading/error states, a query trace, and automotive-specific starter questions. Show interpreted measures/dimensions/filters and validation/execution status without exposing sensitive values. Start with session-scoped history unless durable saved history is approved. Feedback is captured for review, not automatically treated as truth.
 
 ### Authentication, organization context, and RBAC
 
-Reuse current sign-in, organization selection, roles, entitlements, API guards, field rules, and database row policies. Derive user and active organization from trusted server context, never from prompts, model output, or unchecked request fields. Authorize before exposing semantic metadata, retrieving memory/documents, planning, executing, and returning results/history. Reauthorize every follow-up. Scope workbooks, documents, examples, and conversations to the organization. Chat cannot grant privileges beyond existing permissions.
+Reuse current sign-in, organization selection, roles, entitlements, API guards, field rules, and database row policies. Derive user and active organization from trusted server context, never from prompts, model output, or unchecked request fields. Authorize before exposing semantic metadata, planning, executing, and returning results/history. Reauthorize every follow-up. Scope examples and conversations to the organization. Chat cannot grant privileges beyond existing permissions.
 
 ### Data source abstraction and ingestion
 
-Use a common adapter boundary so sources share the same Cube Query and semantic contract.
-
-- **PostgreSQL adapter:** primary source; use existing protected NestJS/database paths and preserve PostgreSQL/ParadeDB and current policies.
-- **Excel + DuckDB adapter:** inspect sheets, headers/types, formulas/cached values, merged cells, inconsistent types and totals/subtotals; normalize selected tables into DuckDB. Report ambiguous or unsupported structures instead of silently trusting them.
-- **Source registry:** expose only sources enabled and authorized for the current organization; keep credentials server-side.
-- Design for later CSV/other engines, but build only PostgreSQL and the bounded Excel demonstration now.
+Use the existing protected PostgreSQL path as the only source adapter in this
+PoC. Preserve PostgreSQL/ParadeDB, database roles, row-level policies, and
+parameterized read-only access. Keep a future adapter extension point in the
+design, but do not build a source registry, workbook ingestion, DuckDB worker,
+or file-handling flow now.
 
 ### Semantic Layer (automotive MDL-like project)
 
-Create a small, approved business contract over raw tables: models/entities, exposed columns, keys, relationships and allowed joins; descriptions, synonyms, units and enum meanings; approved dimensions and measures with aggregation/formula behavior; default filters; and role-sensitive fields. Map semantic objects to source tables so one meaning can target PostgreSQL or normalized DuckDB tables.
+Create a small, approved business contract over the automotive PostgreSQL
+tables: models/entities, exposed columns, keys, relationships and allowed joins;
+descriptions, synonyms, units and enum meanings; approved dimensions and
+measures with aggregation behavior; default filters; and role-sensitive fields.
 
 Keep definitions reviewable and versioned. Introspection/model-generated suggestions are drafts until approved. Do not expose every database column by default.
 
@@ -143,7 +180,10 @@ For each question, retrieve only relevant semantic models, fields, relationships
 
 ### Intent Planner and Cube Query JSON
 
-Classify as structured lookup/analytics, document retrieval, hybrid, clarification-needed, or unsupported. For structured intent, the local model proposes a versioned, constrained Cube Query JSON object containing approved model, measures, dimensions, filters, sorting, and limits. Cube Query is an intermediate contract, not SQL, and is source-independent.
+Classify as structured lookup/analytics, clarification-needed, or unsupported.
+For structured intent, the local model proposes a versioned, constrained Cube
+Query JSON object containing approved model, measures, dimensions, filters,
+sorting, and limits. Cube Query is an intermediate contract, not SQL.
 
 Illustrative only; final schema depends on the automotive model:
 
@@ -163,17 +203,30 @@ Follow-up context is revalidated and reauthorized each turn. Do not trust IDs or
 
 The validator checks contract version, models/fields, types/operators, aggregation rules, join paths, limits/complexity, source enablement, user/org/role access, row scope, and field visibility. Ambiguity requires clarification; unsupported requests fail clearly.
 
-QGen converts only validated Cube Query objects into a bounded logical plan and parameterized target-specific SQL. Initial targets: PostgreSQL and DuckDB. The LLM has no database credentials; never execute raw model-generated SQL. Queries are read-only, bounded, and subject to timeouts.
+QGen converts only validated Cube Query objects into a bounded logical plan and
+parameterized PostgreSQL SQL. The LLM has no database credentials; never
+execute raw model-generated SQL. Queries are read-only, bounded, and subject to
+timeouts.
 
-Adapters handle connection lifecycle, dialect details, type normalization, limits and structured results. PostgreSQL stays on the existing protected application path. DuckDB may be embedded or an isolated worker depending on repository findings and file-isolation needs. Keep a reviewable query trace with selected semantic objects, validation, source, redacted/role-gated plan, status and timing.
+The PostgreSQL adapter handles connection lifecycle, type normalization,
+limits, and structured results on the existing protected application path.
+Keep a reviewable query trace with selected semantic objects, validation,
+source, redacted/role-gated plan, status, and timing.
 
-### RAG and hybrid answers
+### Deferred: Excel/DuckDB and RAG
 
-Ingest an approved sample of automotive manuals/service documents with organization/source metadata. Chunk and index locally; retrieve only authorized content; cite file plus page/section. Hybrid questions run structured computation and document retrieval through separate governed paths and combine them with explicit attribution. A document-described formula must be approved as a semantic measure before use in calculations.
+Excel/DuckDB ingestion, document ingestion, embeddings, RAG, and hybrid answers
+are outside this PoC. Revisit them only after the PostgreSQL conversational
+slice is complete and you approve a separate scope and change proposal.
 
 ### Results and quality loop
 
-Return concise answers grounded in structured rows and/or cited passages, with tables/cards and optional simple charts. Explain empty results, ambiguity, validation failures, malformed workbooks and model outages. Maintain a small golden set of automotive questions with expected Cube Query meaning, access outcome and result shape. Support dry-plan/validation and bounded repair or clarification; never silently broaden access or alter a metric.
+Return concise answers grounded in authorized structured rows, with tables/cards
+and optional simple charts. Explain empty results, ambiguity, validation
+failures, and model outages. Maintain a small golden set of automotive
+questions with expected Cube Query meaning, access outcome, and result shape.
+Support dry-plan/validation and bounded clarification; never silently broaden
+access or alter a metric.
 
 ## Detailed engineering decisions from the learning notes
 
@@ -202,7 +255,7 @@ The first engineering proof should not start with prompt tuning. Recommended imp
 4. Implement semantic validation, deterministic QGen, parameter binding, and a protected read-only executor.
 5. Compare output with independently written reference SQL, including authorization and join-grain cases.
 6. Only then ask the local LLM to propose Cube Query JSON; invalid proposals must be clarified or rejected.
-7. Add structured conversation state, visual results, Excel/DuckDB, and RAG in separately approved stages.
+7. Add structured conversation state and visual results. Keep Excel/DuckDB and RAG deferred unless you approve a later PoC scope change.
 
 Our Cube Query is our own contract. It is not ThoughtSpot AgentQL, Wren MDL, Wren's cube API, or raw SQL. If Wren is evaluated as an engine, place it behind an adapter and test its actual API/version, query syntax, dialect output, correctness, licensing, runtime footprint, and tenancy compatibility before adoption. Keep a go/no-go record; do not assume Wren's commercial authorization features are present in OSS core.
 
@@ -259,19 +312,14 @@ apps/
     qgen/                       # validated Cube Query -> target plan/SQL
     data-sources/
       postgres/                 # existing protected access path adapter
-      duckdb/                   # Excel-normalized table adapter
-    rag/                        # document ingestion, retrieval, citations
     llm/                        # local provider interface/implementation
-    memory/                     # approved, organization-scoped context/examples
     answers/                    # response formatting and evidence
   web/src/app/features/
     conversation/               # chat, trace, result views and citations
     semantic-admin/             # only if approved; otherwise reviewed model files
-    source-management/          # only if approved; bounded Excel flow
 semantic/
   automotive/                   # reviewable semantic definitions
   examples/                     # approved question -> Cube Query examples
-documents/ingestion-config/     # config/sample docs only; no user data
 database/migrations/            # only for specifically approved persistence
 compose.yaml                    # existing services plus PoC services
 .env.example                    # settings only; no secrets
@@ -281,7 +329,11 @@ docs/
   local-development.md
 ```
 
-Proposed runtime services: existing web/API/PostgreSQL; local model server; optional local embedding service; optional local vector store if selected for RAG/memory; and DuckDB embedded in API or isolated worker. Use persistent volumes for database, model weights and indexes as appropriate. Keep model access on the internal Compose network by default. Existing catalog app should still start if the model is unavailable; chat then reports that clearly. Document CPU operation; GPU support is optional and host-dependent.
+Proposed runtime services for this PoC: existing web/API/PostgreSQL and a
+local model server. Use persistent volumes for database data and model weights.
+Keep model access on the internal Compose network by default. Existing catalog
+app should still start if the model is unavailable; chat then reports that
+clearly. Document CPU operation; GPU support is optional and host-dependent.
 
 ## Approval-gated delivery stages
 
@@ -294,31 +346,30 @@ At every stage I will show files, behavior and material risks for the next chang
 | 2. Semantic foundation | Small automotive model, Cube Query schema, measures/dimensions, validation, golden examples | Show definitions and file list for approval |
 | 3. PostgreSQL vertical slice | Local LLM → context → Cube Query → validation → QGen → protected PostgreSQL → grounded answer | Show exact diff proposal and wait |
 | 4. RBAC proof | Org/role/row/field checks across context, memory, execution, results, history and errors | Agree scenarios and changes before edits |
-| 5. Excel/DuckDB slice | Bounded workbook, issue reporting, semantic mapping, same Cube Query contract | Show data handling and exact files for approval |
-| 6. RAG/hybrid slice | Approved sample docs, authorized citations, one combined question | Show data handling and exact files for approval |
-| 7. Docker integration | Full local stack, model/data/index volumes, health checks, instructions | Show exact Compose/config/docs changes and wait |
-| 8. Verification/handoff | Agreed checks, golden-query/RBAC outcomes, limits and startup steps | Agree checks before running |
+| 5. Docker integration | Local database and model services, health checks, and startup instructions | Show exact Compose/config/docs changes and wait |
+| 6. Verification/handoff | Agreed checks, golden-query/RBAC outcomes, limits and startup steps | Agree checks before running |
 
 The existing application may already implement some pieces; Stage 1 establishes this so we do not rebuild them.
+
+Excel/DuckDB and RAG/hybrid work are deferred beyond these stages and are not
+part of current PoC acceptance.
 
 ## Acceptance criteria
 
 - A signed-in user asks supported automotive questions and receives evidence-backed answers.
 - PostgreSQL analytics traverses semantic definitions, Cube Query, validation, QGen and the protected adapter.
-- The same query meaning runs against a bounded Excel workbook through DuckDB.
-- A hybrid question returns a computed result plus separately cited document evidence.
 - No prompt, payload, conversation ID or model output crosses an organization boundary or adds privileges.
 - No arbitrary model SQL executes; queries are validated, parameterized, bounded and read-only.
-- Ambiguity, unsupported questions, empty results, malformed workbooks and model outages are handled clearly.
+- Ambiguity, unsupported questions, empty results, and model outages are handled clearly.
 - Results expose appropriate provenance; a small golden set documents demonstrated behavior.
 - The PoC runs locally through Docker Compose without a cloud LLM dependency.
 
 ## Assumptions to review
 
 1. Extend automotive-search and preserve PostgreSQL/ParadeDB, Angular, NestJS, authentication and RBAC.
-2. PostgreSQL is primary; Excel/DuckDB is a bounded portability demonstration from your notes.
-3. Include one bounded automotive document set and one hybrid question to demonstrate RAG.
-4. Ollama is a candidate runtime, not locked; choose the model after checking machine resources.
+2. PostgreSQL is the only data source in the current PoC.
+3. Excel/DuckDB and RAG/hybrid capabilities are deferred and require a separate approval.
+4. Ollama is the preferred local runtime; choose the model after checking machine resources and its license.
 5. Begin with reviewed semantic files, not a full semantic-admin UI, unless you request it.
 6. Decide conversation persistence, file retention and semantic-definition approvers before implementing those features.
 7. Ground exact questions, measures, dimensions and role behavior in the actual schema/policies during Stage 1.

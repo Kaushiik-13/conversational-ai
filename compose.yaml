@@ -1,0 +1,156 @@
+name: ${COMPOSE_PROJECT_NAME:-conversational-ai}
+
+x-db-tools: &db-tools
+  image: conversational-ai-automotive-db-tools
+  build:
+    context: .
+    dockerfile: docker/automotive-db-tools.Dockerfile
+
+services:
+  db:
+    image: paradedb/paradedb:0.24.3-pg18@sha256:8101bedd88112393dc349f71784567a6da8c974b7405d15fc97c62fb955fb5bb
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-automotive_search}
+      POSTGRES_USER: ${POSTGRES_USER:-automotive_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - "${DB_HOST_PORT:-5433}:5432"
+    volumes:
+      - automotive_data:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  migrate:
+    <<: *db-tools
+    command: ["node", "database/migrations/migrate.mjs"]
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://${POSTGRES_USER:-automotive_owner}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-automotive_search}
+      APP_DATABASE_PASSWORD: ${APP_DATABASE_PASSWORD:?Set APP_DATABASE_PASSWORD in .env}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  seed:
+    <<: *db-tools
+    command: ["node", "database/seeds/seed.mjs"]
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://${POSTGRES_USER:-automotive_owner}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-automotive_search}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  bootstrap-accounts:
+    <<: *db-tools
+    command: ["node", "database/seeds/bootstrap-development-accounts.mjs"]
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://${POSTGRES_USER:-automotive_owner}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-automotive_search}
+      DEV_GLOBAL_ADMIN_PASSWORD: ${DEV_GLOBAL_ADMIN_PASSWORD:?Set development account passwords in .env}
+      DEV_ORG_A_ADMIN_PASSWORD: ${DEV_ORG_A_ADMIN_PASSWORD:?Set development account passwords in .env}
+      DEV_ORG_B_ADMIN_PASSWORD: ${DEV_ORG_B_ADMIN_PASSWORD:?Set development account passwords in .env}
+      DEV_ORG_C_ADMIN_PASSWORD: ${DEV_ORG_C_ADMIN_PASSWORD:?Set development account passwords in .env}
+      DEV_ORG_D_ADMIN_PASSWORD: ${DEV_ORG_D_ADMIN_PASSWORD:?Set development account passwords in .env}
+      DEV_ORG_B_RESTRICTED_PASSWORD: ${DEV_ORG_B_RESTRICTED_PASSWORD:?Set development account passwords in .env}
+      DEV_ORG_A_ANALYST_PASSWORD: ${DEV_ORG_A_ANALYST_PASSWORD:?Set development account passwords in .env}
+      DEV_ORG_A_VIEWER_PASSWORD: ${DEV_ORG_A_VIEWER_PASSWORD:?Set development account passwords in .env}
+      DEV_ORG_B_ANALYST_PASSWORD: ${DEV_ORG_B_ANALYST_PASSWORD:?Set development account passwords in .env}
+      DEV_ORG_B_VIEWER_PASSWORD: ${DEV_ORG_B_VIEWER_PASSWORD:?Set development account passwords in .env}
+      DEV_ORG_C_ANALYST_PASSWORD: ${DEV_ORG_C_ANALYST_PASSWORD:?Set development account passwords in .env}
+      DEV_ORG_C_VIEWER_PASSWORD: ${DEV_ORG_C_VIEWER_PASSWORD:?Set development account passwords in .env}
+      DEV_ORG_D_ANALYST_PASSWORD: ${DEV_ORG_D_ANALYST_PASSWORD:?Set development account passwords in .env}
+      DEV_ORG_D_VIEWER_PASSWORD: ${DEV_ORG_D_VIEWER_PASSWORD:?Set development account passwords in .env}
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/conversational-api.Dockerfile
+    environment:
+      NODE_ENV: production
+      API_PORT: 3000
+      DATABASE_URL: postgresql://${APP_DATABASE_USER:-automotive_app}:${APP_DATABASE_PASSWORD:?Set APP_DATABASE_PASSWORD in .env}@db:5432/${POSTGRES_DB:-automotive_search}
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:?Set ACCESS_TOKEN_SECRET in .env}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?Set REFRESH_TOKEN_SECRET in .env}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:4200}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      ACCESS_TOKEN_TTL_SECONDS: ${ACCESS_TOKEN_TTL_SECONDS:-900}
+      REFRESH_IDLE_TTL_SECONDS: ${REFRESH_IDLE_TTL_SECONDS:-604800}
+      REFRESH_ABSOLUTE_TTL_SECONDS: ${REFRESH_ABSOLUTE_TTL_SECONDS:-2592000}
+      LOGIN_ACCOUNT_LIMIT: ${LOGIN_ACCOUNT_LIMIT:-5}
+      LOGIN_IP_LIMIT: ${LOGIN_IP_LIMIT:-20}
+      LOGIN_WINDOW_SECONDS: ${LOGIN_WINDOW_SECONDS:-900}
+      CUBE_QUERY_PACKAGE_ENTRY: /workspace/packages/cube-query/src/qgen.mjs
+    ports:
+      - "${API_PORT:-3000}:3000"
+    depends_on:
+      bootstrap-accounts:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/api/v1/health').then(response => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1));",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./automotive-search
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "${WEB_PORT:-4200}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O - http://127.0.0.1:8080/health | grep -q '^ok$'",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  catalog-generator:
+    <<: *db-tools
+    profiles: [data-generation]
+    command: ["node", "database/generators/generate-catalog.mjs"]
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://${POSTGRES_USER:-automotive_owner}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-automotive_search}
+      DISK_GUARD_DRIVE: /host-disk-guard
+    volumes:
+      - type: bind
+        source: ${DISK_GUARD_HOST_PATH:-./.data/disk-guard}
+        target: /host-disk-guard
+        read_only: true
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    restart: "no"
+
+volumes:
+  automotive_data:
+    external: true
+    name: automotive_search_paradedb_data

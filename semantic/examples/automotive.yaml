@@ -1,0 +1,50 @@
+version: 1
+model: automotive_catalog
+
+examples:
+  - id: total-part-count
+    question: How many catalog parts can I see?
+    query:
+      version: 1
+      model: automotive_catalog
+      measures: [part_count]
+      dimensions: []
+      filters: []
+      limit: 1
+
+  - id: count-by-commodity
+    question: Show the number of parts in each commodity.
+    query:
+      version: 1
+      model: automotive_catalog
+      measures: [part_count]
+      dimensions: [commodity]
+      filters: []
+      limit: 50
+
+  - id: braking-parts-by-manufacturer
+    question: How many braking parts are there for each manufacturer?
+    query:
+      version: 1
+      model: automotive_catalog
+      measures: [part_count]
+      dimensions: [manufacturer]
+      filters:
+        - field: category
+          operator: equals
+          value: braking
+      limit: 50
+    notes: Category joins must count distinct part IDs to avoid join fan-out.
+
+  - id: active-parts-by-region-and-year
+    question: Show active parts by region and model year.
+    query:
+      version: 1
+      model: automotive_catalog
+      measures: [part_count]
+      dimensions: [region, model_year]
+      filters:
+        - field: active
+          operator: equals
+          value: true
+      limit: 50
