@@ -1,24 +1,25 @@
-import { validateCubeQuery } from './index.mjs';
+import { validateCubeQuery } from "./index.mjs";
 
 const SELECT_EXPRESSIONS = Object.freeze({
-  part_count: 'COUNT(DISTINCT part.id)::text',
-  manufacturer: 'part.manufacturer',
-  commodity: 'part.commodity',
-  sub_commodity: 'part.sub_commodity',
-  vehicle_program: 'part.vehicle_program',
-  region: 'part.region',
-  country: 'part.country',
-  plant: 'part.plant',
-  model_year: 'part.model_year',
-  lifecycle_status: 'part.lifecycle_status',
-  active: 'part.active',
-  category: 'category.name',
+  part_count: "COUNT(DISTINCT part.id)::text",
+  manufacturer_count: "COUNT(DISTINCT part.manufacturer)::text",
+  manufacturer: "part.manufacturer",
+  commodity: "part.commodity",
+  sub_commodity: "part.sub_commodity",
+  vehicle_program: "part.vehicle_program",
+  region: "part.region",
+  country: "part.country",
+  plant: "part.plant",
+  model_year: "part.model_year",
+  lifecycle_status: "part.lifecycle_status",
+  active: "part.active",
+  category: "category.name",
 });
 
 const FILTER_EXPRESSIONS = Object.freeze({
   ...SELECT_EXPRESSIONS,
-  part_number: 'part.part_number',
-  part_name: 'part.part_name',
+  part_number: "part.part_number",
+  part_name: "part.part_name",
 });
 
 const CATEGORY_JOIN = `
@@ -29,18 +30,18 @@ const CATEGORY_JOIN = `
 
 export class CubeQueryValidationError extends Error {
   constructor(errors) {
-    super('Cube Query is invalid.');
-    this.name = 'CubeQueryValidationError';
-    this.code = 'INVALID_CUBE_QUERY';
+    super("Cube Query is invalid.");
+    this.name = "CubeQueryValidationError";
+    this.code = "INVALID_CUBE_QUERY";
     this.errors = errors;
   }
 }
 
 export class CubeQueryAuthorizationError extends Error {
   constructor() {
-    super('The active role cannot read automotive catalog data.');
-    this.name = 'CubeQueryAuthorizationError';
-    this.code = 'ACCESS_DENIED';
+    super("The active role cannot read automotive catalog data.");
+    this.name = "CubeQueryAuthorizationError";
+    this.code = "ACCESS_DENIED";
   }
 }
 
@@ -54,8 +55,8 @@ function pushParameter(values, value) {
 }
 
 function compileFilter(filter, values) {
-  if (filter.field === 'category') {
-    const slugs = filter.operator === 'in' ? filter.value : [filter.value];
+  if (filter.field === "category") {
+    const slugs = filter.operator === "in" ? filter.value : [filter.value];
     const placeholders = slugs.map((slug) => pushParameter(values, slug));
     return `EXISTS (
   SELECT 1
@@ -63,29 +64,31 @@ function compileFilter(filter, values) {
   JOIN catalog.categories AS filter_category
     ON filter_category.id = filter_part_category.category_id
   JOIN catalog.categories AS filter_root
-    ON filter_root.slug IN (${placeholders.join(', ')})
+    ON filter_root.slug IN (${placeholders.join(", ")})
   WHERE filter_part_category.part_id = part.id
     AND filter_category.path <@ filter_root.path
 )`;
   }
 
   const expression = FILTER_EXPRESSIONS[filter.field];
-  if (filter.operator === 'in') {
-    const placeholders = filter.value.map((value) => pushParameter(values, value));
-    return `${expression} IN (${placeholders.join(', ')})`;
+  if (filter.operator === "in") {
+    const placeholders = filter.value.map((value) =>
+      pushParameter(values, value),
+    );
+    return `${expression} IN (${placeholders.join(", ")})`;
   }
-  if (filter.operator === 'contains') {
+  if (filter.operator === "contains") {
     const pattern = `%${escapeLikeValue(filter.value)}%`;
     const placeholder = pushParameter(values, pattern);
     return `${expression} ILIKE ${placeholder} ESCAPE '!'`;
   }
 
   const operators = Object.freeze({
-    equals: '=',
-    gt: '>',
-    gte: '>=',
-    lt: '<',
-    lte: '<=',
+    equals: "=",
+    gt: ">",
+    gte: ">=",
+    lt: "<",
+    lte: "<=",
   });
   const sqlOperator = operators[filter.operator];
   const placeholder = pushParameter(values, filter.value);
@@ -102,29 +105,36 @@ export function compileCubeQuery(input) {
   if (!result.valid) throw new CubeQueryValidationError(result.errors);
 
   const { query } = result;
-  const usesCategory = query.dimensions.includes('category');
+  const usesCategory = query.dimensions.includes("category");
   const values = [];
   const selected = [
-    `${SELECT_EXPRESSIONS.part_count} AS part_count`,
+    ...query.measures.map(
+      (measure) => `${SELECT_EXPRESSIONS[measure]} AS ${measure}`,
+    ),
     ...query.dimensions.map(
       (dimension) => `${SELECT_EXPRESSIONS[dimension]} AS ${dimension}`,
     ),
   ];
-  const joins = usesCategory ? CATEGORY_JOIN : '';
-  const predicates = query.filters.map((filter) => compileFilter(filter, values));
-  const whereClause = predicates.length > 0 ? `\nWHERE ${predicates.join('\n  AND ')}` : '';
-  const groupBy = query.dimensions.length > 0
-    ? `\nGROUP BY ${query.dimensions.map((dimension) => SELECT_EXPRESSIONS[dimension]).join(', ')}`
-    : '';
-  const orderBy = query.order_by?.length > 0
-    ? `\nORDER BY ${query.order_by
-        .map(({ field, direction }) => `${field} ${direction.toUpperCase()}`)
-        .join(', ')}`
-    : '';
+  const joins = usesCategory ? CATEGORY_JOIN : "";
+  const predicates = query.filters.map((filter) =>
+    compileFilter(filter, values),
+  );
+  const whereClause =
+    predicates.length > 0 ? `\nWHERE ${predicates.join("\n  AND ")}` : "";
+  const groupBy =
+    query.dimensions.length > 0
+      ? `\nGROUP BY ${query.dimensions.map((dimension) => SELECT_EXPRESSIONS[dimension]).join(", ")}`
+      : "";
+  const orderBy =
+    query.order_by?.length > 0
+      ? `\nORDER BY ${query.order_by
+          .map(({ field, direction }) => `${field} ${direction.toUpperCase()}`)
+          .join(", ")}`
+      : "";
   const limit = pushParameter(values, query.limit);
 
   return {
-    text: `SELECT ${selected.join(', ')}\nFROM catalog.part_catalog AS part${joins ? `\n${joins}` : ''}${whereClause}${groupBy}${orderBy}\nLIMIT ${limit}`,
+    text: `SELECT ${selected.join(", ")}\nFROM catalog.part_catalog AS part${joins ? `\n${joins}` : ""}${whereClause}${groupBy}${orderBy}\nLIMIT ${limit}`,
     values,
     query,
   };
@@ -137,19 +147,30 @@ export function compileCubeQuery(input) {
  * @param {unknown} input
  * @param {(operation: (client: { query: Function }) => Promise<unknown>) => Promise<unknown>} runInAuthorizationContext
  */
-export async function executeAuthorizedCubeQuery(input, runInAuthorizationContext) {
-  if (typeof runInAuthorizationContext !== 'function') {
-    throw new TypeError('A trusted authorization-context runner is required.');
+export async function executeAuthorizedCubeQuery(
+  input,
+  runInAuthorizationContext,
+) {
+  if (typeof runInAuthorizationContext !== "function") {
+    throw new TypeError("A trusted authorization-context runner is required.");
   }
 
   const compiled = compileCubeQuery(input);
   return runInAuthorizationContext(async (client) => {
     const authorization = await client.query(
-      'SELECT security.authz_has_permission($1) AS allowed',
-      ['catalog.read'],
+      "SELECT security.authz_has_permission($1) AS allowed",
+      ["catalog.read"],
     );
     if (authorization.rows[0]?.allowed !== true) {
       throw new CubeQueryAuthorizationError();
+    }
+    if (compiled.query.dimensions.includes("category")) {
+      // RLS makes PostgreSQL underestimate the visible part rows and choose a
+      // nested loop that revisits millions of category assignments. Keep this
+      // tuning transaction-local and scoped to category breakdowns only.
+      await client.query("SET LOCAL enable_nestloop = off");
+      await client.query("SET LOCAL max_parallel_workers_per_gather = 0");
+      await client.query("SET LOCAL work_mem = '64MB'");
     }
     const result = await client.query(compiled.text, compiled.values);
     return {

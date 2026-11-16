@@ -7,6 +7,44 @@ x-db-tools: &db-tools
     dockerfile: docker/automotive-db-tools.Dockerfile
 
 services:
+  ollama:
+    image: ollama/ollama:0.40.16
+    environment:
+      OLLAMA_NO_CLOUD: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_CONTEXT_LENGTH: "4096"
+      OLLAMA_KEEP_ALIVE: "30m"
+    volumes:
+      - type: bind
+        source: ./.data/ollama
+        target: /root/.ollama
+    networks: [llm]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+    restart: unless-stopped
+
+  ollama-model:
+    image: ollama/ollama:0.40.16
+    entrypoint: ["sh", "-c"]
+    command: ['ollama pull "$$OLLAMA_MODEL" && ollama run "$$OLLAMA_MODEL" ""']
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:2b}
+    volumes:
+      - type: bind
+        source: ./.data/ollama
+        target: /root/.ollama
+    networks: [llm]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
   db:
     image: paradedb/paradedb:0.24.3-pg18@sha256:8101bedd88112393dc349f71784567a6da8c974b7405d15fc97c62fb955fb5bb
     environment:
@@ -93,11 +131,18 @@ services:
       LOGIN_IP_LIMIT: ${LOGIN_IP_LIMIT:-20}
       LOGIN_WINDOW_SECONDS: ${LOGIN_WINDOW_SECONDS:-900}
       CUBE_QUERY_PACKAGE_ENTRY: /workspace/packages/cube-query/src/qgen.mjs
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:2b}
+      SEMANTIC_MODEL_PATH: /workspace/semantic/automotive/catalog.yaml
+      CONVERSATION_PLAN_SCHEMA_PATH: /workspace/packages/cube-query/conversation-plan.v1.schema.json
     ports:
       - "${API_PORT:-3000}:3000"
     depends_on:
       bootstrap-accounts:
         condition: service_completed_successfully
+      ollama-model:
+        condition: service_completed_successfully
+    networks: [default, llm]
     healthcheck:
       test:
         [
@@ -154,3 +199,6 @@ volumes:
   automotive_data:
     external: true
     name: automotive_search_paradedb_data
+
+networks:
+  llm: {}

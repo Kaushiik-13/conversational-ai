@@ -30,6 +30,10 @@ measures:
     description: Number of distinct catalog parts visible to the authenticated user.
     aggregation: count_distinct
     expression: part.id
+  manufacturer_count:
+    description: Number of distinct manufacturers represented in visible catalog parts.
+    aggregation: count_distinct
+    expression: part.manufacturer
 
 dimensions:
   manufacturer:
@@ -44,6 +48,24 @@ dimensions:
     type: string
     groupable: true
     filterable: true
+    known_values:
+      - ADAS
+      - Battery
+      - Body
+      - Braking
+      - Electrical
+      - Engine
+      - Interior
+      - Safety
+      - Steering
+      - Suspension
+      - Thermal
+      - Transmission
+      - Tyres and Wheels
+    synonyms:
+      brake parts: Braking
+      brake components: Braking
+      braking components: Braking
   sub_commodity:
     description: More specific commodity classification.
     expression: part.sub_commodity
@@ -62,6 +84,14 @@ dimensions:
     type: string
     groupable: true
     filterable: true
+    known_values:
+      - Africa
+      - Asia
+      - Europe
+      - Middle East
+      - North America
+      - Oceania
+      - South America
   country:
     description: Country associated with the part record.
     expression: part.country
@@ -86,6 +116,12 @@ dimensions:
     type: string
     groupable: true
     filterable: true
+    known_values:
+      - active
+      - prototype
+      - superseded
+      - obsolete
+      - end-of-life
   active:
     description: Whether the catalog record is active.
     expression: part.active
@@ -100,6 +136,12 @@ dimensions:
     filterable: true
     filter_expression: category.slug
     filter_behavior: match_selected_category_and_descendants
+    known_values:
+      - brake-pads
+    synonyms:
+      brake pad: brake-pads
+      brake pads: brake-pads
+      brake-pad: brake-pads
     join:
       table: catalog.part_categories
       alias: part_category

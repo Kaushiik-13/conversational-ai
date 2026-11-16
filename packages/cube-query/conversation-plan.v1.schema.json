@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Automotive conversational query plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "cube_query"],
+  "oneOf": [
+    {
+      "properties": {
+        "status": { "const": "query" },
+        "cube_query": { "$ref": "#/$defs/cubeQuery" }
+      }
+    },
+    {
+      "properties": {
+        "status": { "enum": ["clarification", "unsupported"] },
+        "cube_query": { "type": "null" }
+      }
+    }
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["query", "clarification", "unsupported"]
+    },
+    "cube_query": {},
+    "message": { "type": "string", "minLength": 1, "maxLength": 500 }
+  },
+  "$defs": {
+    "cubeQuery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "model",
+        "measures",
+        "dimensions",
+        "filters",
+        "limit"
+      ],
+      "properties": {
+        "version": { "const": 1 },
+        "model": { "const": "automotive_catalog" },
+        "measures": {
+          "type": "array",
+          "items": { "enum": ["part_count", "manufacturer_count"] },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "dimensions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 3
+        },
+        "filters": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["field", "operator", "value"],
+            "properties": {
+              "field": { "type": "string" },
+              "operator": { "type": "string" },
+              "value": {}
+            }
+          }
+        },
+        "order_by": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["field", "direction"],
+            "properties": {
+              "field": { "type": "string" },
+              "direction": { "type": "string", "enum": ["asc", "desc"] }
+            }
+          }
+        },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
+      }
+    }
+  }
+}

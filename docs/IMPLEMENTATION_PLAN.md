@@ -1,6 +1,6 @@
 # Automotive Conversational AI PoC — Implementation Plan
 
-**Status:** Draft for review  
+**Status:** PoC implementation in progress — local model, governed query path, RBAC proof, and first chat UI implemented
 **Reference:** Wren AI  
 **Foundation:** [automotive-search](https://github.com/Kaushiik-13/automotive-search)  
 **Approval rule:** No application-code changes until you approve the plan and the specific change set for each stage.
@@ -23,14 +23,14 @@
 
 ### Open-source components and license notes
 
-| Area | PoC choice | License / boundary |
-|---|---|---|
-| Database | Existing PostgreSQL with ParadeDB | PostgreSQL uses its permissive PostgreSQL License. ParadeDB Community is AGPL-3.0; keep this visible when distributing or hosting the product. |
-| Local model runtime | Ollama, preferred | Ollama software is MIT-licensed. Model weights have separate terms and must be reviewed before selection. |
-| Semantic query | Project-owned Cube Query and QGen | Only approved semantic fields are exposed; all filters and limits are parameterized. |
-| Excel analytics | Deferred | DuckDB is a possible later choice; no Excel ingestion or DuckDB service is in this PoC. |
-| Document retrieval | Deferred | No RAG, embeddings, vector index, or document ingestion in this PoC. |
-| Packaging | Docker Compose | Local services and data stay on the development machine by default. |
+| Area                | PoC choice                        | License / boundary                                                                                                                             |
+| ------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Database            | Existing PostgreSQL with ParadeDB | PostgreSQL uses its permissive PostgreSQL License. ParadeDB Community is AGPL-3.0; keep this visible when distributing or hosting the product. |
+| Local model runtime | Ollama, preferred                 | Ollama software is MIT-licensed. Model weights have separate terms and must be reviewed before selection.                                      |
+| Semantic query      | Project-owned Cube Query and QGen | Only approved semantic fields are exposed; all filters and limits are parameterized.                                                           |
+| Excel analytics     | Deferred                          | DuckDB is a possible later choice; no Excel ingestion or DuckDB service is in this PoC.                                                        |
+| Document retrieval  | Deferred                          | No RAG, embeddings, vector index, or document ingestion in this PoC.                                                                           |
+| Packaging           | Docker Compose                    | Local services and data stay on the development machine by default.                                                                            |
 
 References: [PostgreSQL license](https://www.postgresql.org/about/licence/),
 [ParadeDB license](https://github.com/paradedb/paradedb/blob/main/LICENSE),
@@ -41,18 +41,74 @@ References: [PostgreSQL license](https://www.postgresql.org/about/licence/),
 
 - The automotive database contains five million generated rows on the D: drive.
 - The semantic model, Cube Query v1 schema, validator, and QGen prototype are
-  present locally. The Cube Query package has nine passing tests; authenticated
-  query checks passed for Org A, Org B, and the restricted Org B viewer.
+  present locally. The Cube Query package has nine passing tests.
 - Existing automotive-search validations for Phases 3, 4, 7, 8, and 9 pass.
 - Phases 5, 6, and 11 currently fail: Phase 5 has stale expectations for the
   number of development accounts; Phases 6 and 11 find that the seed did not
   populate expected field-access rules. These failures must be resolved before
   pushing. Changes to the separate automotive-search source repo require your
   approval first.
-- The authenticated `POST /api/v1/conversation/query` route is now integrated
-  with the existing session, `catalog.read` permission, protected database
-  context, audit event, validator, and QGen. The local-model natural-language
-  planner and chat UI are still not implemented.
+- The authenticated `POST /api/v1/conversation/query` route is integrated with
+  the existing session, `catalog.read` permission, protected database context,
+  audit event, validator, and QGen. `POST /api/v1/conversation/ask` now accepts
+  natural-language questions. Clear common patterns for totals, region
+  breakdowns, manufacturer-by-region, sub-commodity, lifecycle status,
+  category, and exact part-number questions are mapped to Cube Query JSON
+  directly; open-ended questions use local Ollama `qwen3.5:2b`. Every plan
+  goes through deterministic validation, QGen, and the protected database
+  path. The model does not write or execute SQL.
+- A first Angular chat page is available at `/conversation`. It includes
+  automotive starter questions, loading/error states, answers and result
+  tables, and a compact interpretation trace. The browser keeps the current
+  page transcript and sends up to four prior successful questions with their
+  interpreted query plans for follow-up understanding. Result rows are not
+  included in model context, and every new plan is revalidated and reauthorized.
+  Conversation history is not persisted across page sessions.
+- The current web and API containers are healthy. Manual browser sign-in and
+  chat use remain for the developer to verify. The local development account
+  bootstrap service currently exits because its Org A Analyst password no
+  longer matches the database after the password was changed; credentials were
+  not modified. To keep the running API and web available, they were started
+  without rerunning dependent startup jobs. Sync the local development password
+  before relying on a fresh full Compose startup.
+
+### Verified RBAC proof for the conversational ask endpoint
+
+The following signed-in account checks returned only the active organization’s
+expected row scope. These are proof cases, not a claim that every role and policy
+combination has been tested:
+
+| Account context                   | Result from “How many parts are there in total?” |
+| --------------------------------- | -----------------------------------------------: |
+| Org A administrator (`org-a`)     |                                        5,000,000 |
+| Org B administrator (`org-b`)     |                                        1,250,000 |
+| Org B restricted viewer (`org-b`) |                                           10,546 |
+
+The same organization-scoped behavior is enforced by the existing authenticated
+database path; the model does not choose an organization or role.
+
+### Current local verification
+
+- API lint and build passed; API tests: 13 passed.
+- Cube Query package tests: 9 passed.
+- Web production build passed; web tests: 8 passed.
+- Local-model planner produced a valid supported commodity query; a cost
+  question outside the approved semantic model was rejected as unsupported.
+- API health and web health endpoints returned healthy after the web image was
+  rebuilt. The five-million-row automotive dataset and Ollama model files stay
+  on D: (`D:\Docker\WSL-Data` and the ignored project `.data\ollama` folder).
+- A proposed golden-question scorecard and organization-product roadmap are in
+  [CONVERSATIONAL_AI_EVALUATION.md](CONVERSATIONAL_AI_EVALUATION.md). It records
+  known dataset baselines, measurable pass criteria, and the current latency
+  variability; it does not approve further code changes.
+- The local conversation evaluator now runs 22 golden cases. API lint/build
+  pass with 20 API tests; the Cube Query package has 10 passing tests. The
+  current total, region, and category fixes passed 9/9 live checks. An
+  authorization-context profile and live repeats reduced category query time
+  from about 198 seconds to about 31 seconds. The last full evaluation was
+  before these fixes (17/22); the whole suite has not been rerun, and Org B
+  totals were intentionally not retested. See the evaluation report for the
+  measured results and remaining verification.
 
 ## Goal and architecture
 
@@ -192,10 +248,16 @@ Illustrative only; final schema depends on the automotive model:
   "model": "automotive_catalog",
   "measures": ["part_count"],
   "dimensions": ["category"],
-  "filters": [{"field": "make", "operator": "equals", "value": "Toyota"}],
+  "filters": [{ "field": "make", "operator": "equals", "value": "Toyota" }],
   "limit": 50
 }
 ```
+
+The current PoC supports `part_count` and a distinct `manufacturer_count`.
+For example, counting manufacturers that make brake pads uses the approved
+`manufacturer_count` measure and the `brake-pads` category filter. Other
+aggregations should be added as explicit semantic measures with tests, rather
+than inferred from arbitrary database fields.
 
 Follow-up context is revalidated and reauthorized each turn. Do not trust IDs or filters simply because they appeared earlier.
 
@@ -234,14 +296,14 @@ access or alter a metric.
 
 The LLM proposes intent and Cube Query JSON; trusted backend components own all consequential decisions. Treat correctness as several separate questions:
 
-| Check | What it establishes | Example failure |
-|---|---|---|
-| Contract correctness | The JSON has the expected structure and supported operators | Unknown property or invalid filter type |
+| Check                | What it establishes                                                             | Example failure                                           |
+| -------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Contract correctness | The JSON has the expected structure and supported operators                     | Unknown property or invalid filter type                   |
 | Semantic correctness | The request maps to the intended business definitions, relationships, and grain | “Manufacturer” could mean the part maker or vehicle brand |
-| SQL structure/safety | QGen produced only allowed, parameterized, read-only SQL over modeled objects | A write statement or unapproved function/table |
-| Authorization | The signed-in actor may read the requested semantic fields and rows | An organization boundary is crossed |
-| Result correctness | The executed query computes the expected metric over the correct scope | A compatibility join counts the same part several times |
-| Answer faithfulness | The summary says only what the returned rows and evidence support | Inferring inventory availability from catalog presence |
+| SQL structure/safety | QGen produced only allowed, parameterized, read-only SQL over modeled objects   | A write statement or unapproved function/table            |
+| Authorization        | The signed-in actor may read the requested semantic fields and rows             | An organization boundary is crossed                       |
+| Result correctness   | The executed query computes the expected metric over the correct scope          | A compatibility join counts the same part several times   |
+| Answer faithfulness  | The summary says only what the returned rows and evidence support               | Inferring inventory availability from catalog presence    |
 
 Passing one check does not imply passing the others. SQL parsing/AST inspection is useful but is not a replacement for building queries from approved operations, database privileges, row policies, limits, and result-level evaluation.
 
@@ -273,12 +335,12 @@ Use least-privileged read-only credentials and enforce permissions in the applic
 
 Keep a validated analytical state (last accepted Cube Query, selected metrics/dimensions, filters, sort, source and relevant history), not only the transcript. A follow-up can propose one of four operations:
 
-| Operation | Example | State effect |
-|---|---|---|
-| Replace | “What about Honda?” | Replace vehicle-brand filter, retain other filters |
-| Add | “Only active parts” | Add an approved active-parts filter |
-| Remove | “Include every category” | Remove the category filter |
-| Reset | “Start a new analysis” | Clear the current analytical state |
+| Operation | Example                  | State effect                                       |
+| --------- | ------------------------ | -------------------------------------------------- |
+| Replace   | “What about Honda?”      | Replace vehicle-brand filter, retain other filters |
+| Add       | “Only active parts”      | Add an approved active-parts filter                |
+| Remove    | “Include every category” | Remove the category filter                         |
+| Reset     | “Start a new analysis”   | Clear the current analytical state                 |
 
 Every proposed change is validated and reauthorized. If it could refer to multiple fields or metrics, ask a clarification. Start without long-term AI memory; add tenant-scoped approved examples only when their governance and retention are defined.
 
@@ -339,15 +401,15 @@ clearly. Document CPU operation; GPU support is optional and host-dependent.
 
 At every stage I will show files, behavior and material risks for the next change and wait for your explicit approval before editing application code. Approving this plan does not approve later stages.
 
-| Stage | Work | Review point |
-|---|---|---|
-| 0. Plan | Agree scope, architecture, sample questions and local model constraints | You approve/revise this document |
-| 1. Read-only assessment | Inspect checkout/current edits, API/auth/RBAC, schema/search, Docker; map existing vs missing modules | Report findings and exact Stage 2 file list; no edits |
-| 2. Semantic foundation | Small automotive model, Cube Query schema, measures/dimensions, validation, golden examples | Show definitions and file list for approval |
-| 3. PostgreSQL vertical slice | Local LLM → context → Cube Query → validation → QGen → protected PostgreSQL → grounded answer | Show exact diff proposal and wait |
-| 4. RBAC proof | Org/role/row/field checks across context, memory, execution, results, history and errors | Agree scenarios and changes before edits |
-| 5. Docker integration | Local database and model services, health checks, and startup instructions | Show exact Compose/config/docs changes and wait |
-| 6. Verification/handoff | Agreed checks, golden-query/RBAC outcomes, limits and startup steps | Agree checks before running |
+| Stage                        | Work                                                                                                                                                               | Review point                                                                                      |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| 0. Plan                      | Agree scope, architecture, sample questions and local model constraints                                                                                            | You approve/revise this document                                                                  |
+| 1. Read-only assessment      | Inspect checkout/current edits, API/auth/RBAC, schema/search, Docker; map existing vs missing modules                                                              | Report findings and exact Stage 2 file list; no edits                                             |
+| 2. Semantic foundation       | Small automotive model, Cube Query schema, measures/dimensions, validation, golden examples                                                                        | Show definitions and file list for approval                                                       |
+| 3. PostgreSQL vertical slice | Implemented: local LLM → Cube Query → validation → QGen → protected PostgreSQL → grounded answer; recent follow-up context and one validation-repair attempt added | Basic planner and follow-up evaluation passed; persisted conversation history remains future work |
+| 4. RBAC proof                | Implemented for Org A admin, Org B admin, and restricted Org B viewer on the ask endpoint                                                                          | Broader role/field/error/history cases remain to be tested                                        |
+| 5. Docker integration        | Implemented local Ollama and web/API Compose integration; all runtime files and data are on D:                                                                     | Fresh full startup needs the changed Org A Analyst password synced with the database              |
+| 6. Verification/handoff      | Build and unit checks passed; API and web health confirmed                                                                                                         | Developer manual sign-in and chat check remains                                                   |
 
 The existing application may already implement some pieces; Stage 1 establishes this so we do not rebuild them.
 
