@@ -3,7 +3,7 @@
 **Working name:** Conversational AI  
 **First domain:** Automotive catalog analytics  
 **Initial data source:** Existing PostgreSQL/ParadeDB automotive-search project  
-**Model approach:** Local LLM inference  
+**Model approach:** Local Ollama by default; optional OpenRouter API for deployment experiments
 **Status:** Product concept; implementation requires staged approval.
 
 ## The idea
@@ -40,7 +40,7 @@ These are examples, not claims that every field or metric already exists. The ac
 
 1. The user signs in and selects an organization through the existing application.
 2. The system retrieves only the relevant semantic definitions, relationships, approved rules, and examples the user may access.
-3. A local LLM interprets the question and proposes a constrained Cube Query JSON request. It does not choose tenant access or execute SQL.
+3. The configured LLM provider interprets the question and proposes constrained Cube Query JSON. Ollama is the local default; OpenRouter is an explicit optional mode. The model does not choose tenant access or execute SQL.
 4. Backend validation checks the contract, business meaning, available measures/joins, query limits, role permissions, and organization scope.
 5. QGen compiles the approved request into parameterized SQL for an authorized data-source adapter.
 6. The protected adapter executes the query using existing PostgreSQL access controls and returns typed results.
@@ -59,7 +59,7 @@ Excel/DuckDB, and hybrid questions are deferred and are not part of this build.
 - **Conversation state is explicit:** follow-ups carry forward validated query state, not just conversational text.
 - **Tenant boundaries are mandatory:** a prompt, model response, filter, or conversation ID cannot select another organization's data.
 - **Feedback is reviewed:** user corrections inform evaluation and potential semantic updates; they do not automatically become trusted policy.
-- **Local-first inference:** the PoC uses a local model with no cloud fallback; data and model choices remain configurable.
+- **Explicit model routing:** Ollama is the local default; selecting OpenRouter sends question text, approved semantic context, and sanitized query history to that provider. There is no silent fallback. The API key stays on the backend.
 
 ## PoC definition
 
@@ -89,10 +89,10 @@ These benefits are hypotheses to validate with users. The project should not cla
 - Read-only analytics; chat does not create, update, or delete catalog records.
 - PostgreSQL is the only data source in the current PoC.
 - A limited set of approved automotive entities, measures, dimensions, and join paths.
-- One local model runtime, selected after checking host resources.
+- One explicitly selected model provider: Ollama locally by default, or OpenRouter for deployment experiments after data-handling review.
 - Session-level conversation state initially unless durable history is approved.
 - Excel/DuckDB, document ingestion, RAG, and hybrid answers are deferred until separately approved.
-- No arbitrary model-written SQL, cloud model fallback, public deployment, or unrestricted workbook ingestion.
+- No arbitrary model-written SQL, silent cloud fallback, public deployment, or unrestricted workbook ingestion.
 
 ## How we will decide whether it is feasible
 
