@@ -164,7 +164,7 @@ services:
 
   web:
     build:
-      context: ./automotive-search
+      context: .
       dockerfile: apps/web/Dockerfile
     ports:
       - "${WEB_PORT:-4200}:8080"

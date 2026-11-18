@@ -12,7 +12,7 @@
 - The first live run attempt was blocked while Docker Desktop's engine was
   stopped. After it became available, the live checks below were completed.
 - A local golden-case runner is now available at
-  `automotive-search/scripts/evaluate-conversation.mjs`. It reports pass/fail,
+  `scripts/evaluate-conversation.mjs`. It reports pass/fail,
   latency, and request IDs without printing credentials or result rows. It runs
   serially to avoid overloading the local model.
 

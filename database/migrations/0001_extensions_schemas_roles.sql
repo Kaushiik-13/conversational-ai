@@ -1,0 +1,46 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS citext;
+CREATE EXTENSION IF NOT EXISTS ltree;
+CREATE EXTENSION IF NOT EXISTS pg_search;
+
+DO $roles$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'automotive_runtime') THEN
+        CREATE ROLE automotive_runtime
+            NOLOGIN
+            NOSUPERUSER
+            NOCREATEDB
+            NOCREATEROLE
+            NOREPLICATION
+            NOBYPASSRLS;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'automotive_app') THEN
+        CREATE ROLE automotive_app
+            NOLOGIN
+            INHERIT
+            NOSUPERUSER
+            NOCREATEDB
+            NOCREATEROLE
+            NOREPLICATION
+            NOBYPASSRLS;
+    END IF;
+END
+$roles$;
+
+GRANT automotive_runtime TO automotive_app;
+
+CREATE SCHEMA IF NOT EXISTS app AUTHORIZATION CURRENT_USER;
+CREATE SCHEMA IF NOT EXISTS catalog AUTHORIZATION CURRENT_USER;
+CREATE SCHEMA IF NOT EXISTS security AUTHORIZATION CURRENT_USER;
+CREATE SCHEMA IF NOT EXISTS audit AUTHORIZATION CURRENT_USER;
+
+ALTER SCHEMA app OWNER TO CURRENT_USER;
+ALTER SCHEMA catalog OWNER TO CURRENT_USER;
+ALTER SCHEMA security OWNER TO CURRENT_USER;
+ALTER SCHEMA audit OWNER TO CURRENT_USER;
+
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+REVOKE ALL ON SCHEMA app, catalog, security, audit FROM PUBLIC;
+
+GRANT USAGE ON SCHEMA app, catalog, security, audit TO automotive_runtime;

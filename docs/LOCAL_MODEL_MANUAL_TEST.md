@@ -17,25 +17,6 @@ reuse the model from D:.
 
 Open `http://localhost:4200`, sign in, and open the browser developer console.
 
-## Optional OpenRouter smoke test
-
-Ollama remains the default. To test OpenRouter, put these settings in the
-ignored local `.env` file. Keep the key there; never commit it or put it in
-browser code:
-
-```dotenv
-CONVERSATION_LLM_PROVIDER=openrouter
-OPENROUTER_API_KEY=your_server_side_key
-OPENROUTER_MODEL=inclusionai/ling-3.2-flash:free
-```
-
-Rebuild and restart the API container, then ask an open-ended catalog question
-that is not handled by deterministic question patterns. The API sends the plan
-schema, and the backend validates the returned plan before QGen can use it.
-Free-model availability and request limits can change. Set
-`CONVERSATION_LLM_PROVIDER=ollama` to return to local inference.
-With OpenRouter selected, Compose skips downloading the Ollama model weights;
-the local Ollama container is still part of this development Compose stack.
 Use the password currently stored for your account. If a development password
 was changed, its matching `DEV_*_PASSWORD` value in `.env` must also be updated
 before rerunning the `bootstrap-accounts` setup job.

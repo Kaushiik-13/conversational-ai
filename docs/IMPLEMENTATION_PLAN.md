@@ -216,12 +216,9 @@ The current PoC proves one end-to-end scenario in the automotive domain:
 
 The existing automotive PostgreSQL database is the only data source in this PoC. Excel/DuckDB and RAG are deferred. Exact questions, fields, and measures must be chosen from the actual schema and current row-level security policies.
 
-Ollama is the default local LLM provider. OpenRouter can be selected explicitly
-for deployment experiments; the application does not silently fall back
-between providers. When selected, it sends question text, approved semantic
-context, and sanitized query-plan history to the provider. Review provider data
-handling before using organizational data. Evaluate the selected model for
-latency, structured-output behavior, and usage limits.
+Ollama is the local LLM provider. Questions and catalog context stay on the
+development machine. Evaluate the selected model for latency,
+structured-output behavior, and memory use.
 
 Outside the current PoC: chat-driven catalog writes, arbitrary model-written SQL, public deployment, Excel/DuckDB, document ingestion, RAG, and hybrid answers.
 

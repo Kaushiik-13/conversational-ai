@@ -1,2 +1,11 @@
 .env
 .data/
+
+# Dependencies and generated output
+node_modules/
+dist/
+coverage/
+.angular/
+.env.*
+!.env.example
+backups/

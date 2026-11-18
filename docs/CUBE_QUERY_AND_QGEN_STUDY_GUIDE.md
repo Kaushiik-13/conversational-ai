@@ -35,8 +35,8 @@ Read these files in this order:
 2. [`index.mjs`](../packages/cube-query/src/index.mjs) — runtime validation and normalization.
 3. [`qgen.mjs`](../packages/cube-query/src/qgen.mjs) — SQL generation and authorized execution helper.
 4. [`cube-query.test.mjs`](../packages/cube-query/test/cube-query.test.mjs) — examples of accepted and rejected requests.
-5. [`conversation.controller.ts`](../automotive-search/apps/api/src/conversation/conversation.controller.ts) and [`conversation.service.ts`](../automotive-search/apps/api/src/conversation/conversation.service.ts) — the authenticated API route that uses the package.
-6. [`database.service.ts`](../automotive-search/apps/api/src/database/database.service.ts) — the existing database transaction and authorization-context boundary.
+5. [`conversation.controller.ts`](../apps/api/src/conversation/conversation.controller.ts) and [`conversation.service.ts`](../apps/api/src/conversation/conversation.service.ts) — the authenticated API route that uses the package.
+6. [`database.service.ts`](../apps/api/src/database/database.service.ts) — the existing database transaction and authorization-context boundary.
 
 The JSON Schema describes the contract, but the API currently runs the
 handwritten `validateCubeQuery` function. Keep both aligned when the contract
