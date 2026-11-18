@@ -1,5 +1,16 @@
 const MODEL = "automotive_catalog";
-const MEASURES = new Set(["part_count", "manufacturer_count"]);
+const MEASURES = new Set([
+  "part_count",
+  "manufacturer_count",
+  "total_cost_usd",
+  "average_cost_usd",
+  "min_cost_usd",
+  "max_cost_usd",
+  "total_weight_kg",
+  "average_weight_kg",
+  "min_weight_kg",
+  "max_weight_kg",
+]);
 const DIMENSIONS = new Set([
   "manufacturer",
   "commodity",
@@ -12,6 +23,11 @@ const DIMENSIONS = new Set([
   "lifecycle_status",
   "active",
   "category",
+  "material",
+  "supplier_status",
+  "cost_usd",
+  "weight_kg",
+  "document_version",
 ]);
 const STRING_FIELDS = new Set([
   "manufacturer",
@@ -22,18 +38,56 @@ const STRING_FIELDS = new Set([
   "country",
   "plant",
   "lifecycle_status",
+  "material",
+  "supplier_status",
+  "description",
   "category",
   "part_number",
   "part_name",
 ]);
-const FILTER_FIELDS = new Set([...STRING_FIELDS, "model_year", "active"]);
-const SORT_FIELDS = new Set([...DIMENSIONS, ...MEASURES]);
+const NUMBER_FIELDS = new Set([
+  "model_year",
+  "cost_usd",
+  "weight_kg",
+  "document_version",
+]);
+const DATE_FIELDS = new Set(["created_at", "updated_at"]);
+const FILTER_FIELDS = new Set([
+  ...STRING_FIELDS,
+  ...NUMBER_FIELDS,
+  ...DATE_FIELDS,
+  "active",
+]);
+const DETAIL_FIELDS = new Set([
+  "part_number",
+  "part_name",
+  "description",
+  "commodity",
+  "sub_commodity",
+  "manufacturer",
+  "vehicle_program",
+  "region",
+  "country",
+  "plant",
+  "model_year",
+  "material",
+  "lifecycle_status",
+  "supplier_status",
+  "cost_usd",
+  "weight_kg",
+  "active",
+  "document_version",
+  "created_at",
+  "updated_at",
+  "category",
+]);
+const SORT_FIELDS = new Set([...DIMENSIONS, ...MEASURES, ...DETAIL_FIELDS]);
 const STRING_OPERATORS = new Set(["equals", "in", "contains"]);
 const CATEGORY_OPERATORS = new Set(["equals", "in"]);
 const NUMBER_OPERATORS = new Set(["equals", "in", "gt", "gte", "lt", "lte"]);
 const BOOLEAN_OPERATORS = new Set(["equals", "in"]);
-const MAX_DIMENSIONS = 3;
-const MAX_FILTERS = 10;
+const MAX_DIMENSIONS = 5;
+const MAX_FILTERS = 15;
 const MAX_SORTS = 3;
 const MAX_LIMIT = 500;
 const DEFAULT_LIMIT = 50;
@@ -58,9 +112,11 @@ function validateFilterValue(field, operator, value, path, errors) {
       ? CATEGORY_OPERATORS
       : STRING_FIELDS.has(field)
         ? STRING_OPERATORS
-        : field === "model_year"
+        : NUMBER_FIELDS.has(field)
           ? NUMBER_OPERATORS
-          : BOOLEAN_OPERATORS;
+          : DATE_FIELDS.has(field)
+            ? new Set(["equals", "in", "gt", "gte", "lt", "lte"])
+            : BOOLEAN_OPERATORS;
 
   if (!operators.has(operator)) {
     addError(
@@ -72,11 +128,12 @@ function validateFilterValue(field, operator, value, path, errors) {
     return;
   }
 
-  const expectedType = STRING_FIELDS.has(field)
-    ? "string"
-    : field === "model_year"
-      ? "number"
-      : "boolean";
+  const expectedType =
+    STRING_FIELDS.has(field) || DATE_FIELDS.has(field)
+      ? "string"
+      : NUMBER_FIELDS.has(field)
+        ? "number"
+        : "boolean";
   const values = operator === "in" ? value : [value];
 
   if (operator === "in" && !Array.isArray(value)) {
@@ -114,10 +171,12 @@ function validateFilterValue(field, operator, value, path, errors) {
       if (
         typeof item !== "number" ||
         !Number.isFinite(item) ||
-        (field === "model_year" && !Number.isInteger(item))
+        (["model_year", "document_version"].includes(field) &&
+          !Number.isInteger(item))
       ) {
-        const expected =
-          field === "model_year" ? "an integer" : "a finite number";
+        const expected = ["model_year", "document_version"].includes(field)
+          ? "an integer"
+          : "a finite number";
         addError(
           errors,
           itemPath,
@@ -132,6 +191,18 @@ function validateFilterValue(field, operator, value, path, errors) {
         "INVALID_VALUE_TYPE",
         `Field '${field}' requires a ${expectedType} value.`,
       );
+    } else if (DATE_FIELDS.has(field)) {
+      if (
+        Number.isNaN(Date.parse(item)) ||
+        !/^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(item)
+      ) {
+        addError(
+          errors,
+          itemPath,
+          "INVALID_DATE_VALUE",
+          `Field '${field}' requires an ISO date or timestamp.`,
+        );
+      }
     } else if (expectedType === "string") {
       const invalidCategorySlug =
         field === "category" && !/^[a-z][a-z0-9-]{0,126}$/.test(item);
@@ -177,8 +248,10 @@ export function validateCubeQuery(input) {
   const allowedKeys = new Set([
     "version",
     "model",
+    "mode",
     "measures",
     "dimensions",
+    "fields",
     "filters",
     "order_by",
     "limit",
@@ -212,24 +285,97 @@ export function validateCubeQuery(input) {
       `Only model '${MODEL}' is supported.`,
     );
   }
-  if (
-    !Array.isArray(input.measures) ||
-    input.measures.length < 1 ||
-    input.measures.length > 1
-  ) {
+  const mode =
+    input.mode ?? (Array.isArray(input.fields) ? "records" : "aggregate");
+  if (!["aggregate", "records"].includes(mode)) {
     addError(
       errors,
-      "$.measures",
-      "INVALID_MEASURES",
-      "Provide exactly one supported measure.",
+      "$.mode",
+      "INVALID_MODE",
+      "Mode must be aggregate or records.",
     );
-  } else if (input.measures.some((measure) => !MEASURES.has(measure))) {
-    addError(
-      errors,
-      "$.measures",
-      "UNKNOWN_MEASURE",
-      "Supported measures are part_count and manufacturer_count.",
-    );
+  }
+  if (mode === "aggregate") {
+    if (
+      !Array.isArray(input.measures) ||
+      input.measures.length < 1 ||
+      input.measures.length > 1
+    ) {
+      addError(
+        errors,
+        "$.measures",
+        "INVALID_MEASURES",
+        "Provide exactly one supported measure.",
+      );
+    } else if (input.measures.some((measure) => !MEASURES.has(measure))) {
+      addError(
+        errors,
+        "$.measures",
+        "UNKNOWN_MEASURE",
+        "One of the approved catalog measures is required.",
+      );
+    }
+    if (input.fields !== undefined)
+      addError(
+        errors,
+        "$.fields",
+        "FIELDS_NOT_ALLOWED",
+        "Record fields are only allowed in records mode.",
+      );
+  } else {
+    if (
+      input.measures !== undefined &&
+      (!Array.isArray(input.measures) || input.measures.length > 0)
+    ) {
+      addError(
+        errors,
+        "$.measures",
+        "MEASURES_NOT_ALLOWED",
+        "Records mode does not accept aggregate measures.",
+      );
+    }
+    if (
+      input.dimensions !== undefined &&
+      (!Array.isArray(input.dimensions) || input.dimensions.length > 0)
+    ) {
+      addError(
+        errors,
+        "$.dimensions",
+        "DIMENSIONS_NOT_ALLOWED",
+        "Records mode returns selected fields, not grouped dimensions.",
+      );
+    }
+    if (
+      !Array.isArray(input.fields) ||
+      input.fields.length < 1 ||
+      input.fields.length > 25
+    ) {
+      addError(
+        errors,
+        "$.fields",
+        "INVALID_FIELDS",
+        "Select between 1 and 25 approved record fields.",
+      );
+    } else {
+      const seen = new Set();
+      input.fields.forEach((field, index) => {
+        if (!DETAIL_FIELDS.has(field))
+          addError(
+            errors,
+            `$.fields[${index}]`,
+            "UNKNOWN_RECORD_FIELD",
+            `Record field '${field}' is not allowed.`,
+          );
+        else if (seen.has(field))
+          addError(
+            errors,
+            `$.fields[${index}]`,
+            "DUPLICATE_RECORD_FIELD",
+            `Record field '${field}' is repeated.`,
+          );
+        seen.add(field);
+      });
+    }
   }
 
   if (
@@ -375,7 +521,8 @@ export function validateCubeQuery(input) {
           );
         } else if (
           !input.dimensions?.includes(sort.field) &&
-          !input.measures?.includes(sort.field)
+          !input.measures?.includes(sort.field) &&
+          !input.fields?.includes(sort.field)
         ) {
           addError(
             errors,
@@ -411,6 +558,14 @@ export function validateCubeQuery(input) {
     );
   }
 
+  if (mode === "records" && input.limit !== undefined && input.limit > 100) {
+    addError(
+      errors,
+      "$.limit",
+      "RECORD_LIMIT_EXCEEDED",
+      "Part-detail queries are limited to 100 rows.",
+    );
+  }
   if (errors.length > 0) return { valid: false, errors };
 
   return {
@@ -418,8 +573,10 @@ export function validateCubeQuery(input) {
     query: {
       version: 1,
       model: MODEL,
-      measures: [...input.measures],
-      dimensions: [...input.dimensions],
+      mode,
+      measures: mode === "aggregate" ? [...input.measures] : [],
+      dimensions: mode === "aggregate" ? [...input.dimensions] : [],
+      ...(mode === "records" ? { fields: [...input.fields] } : {}),
       filters: input.filters.map((filter) => ({
         field: filter.field,
         operator: filter.operator,

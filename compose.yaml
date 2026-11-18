@@ -33,7 +33,7 @@ services:
     entrypoint: ["sh", "-c"]
     command:
       [
-        'if [ "$$CONVERSATION_LLM_PROVIDER" = "ollama" ]; then ollama pull "$$OLLAMA_MODEL" && ollama run "$$OLLAMA_MODEL" ""; else echo "Skipping Ollama model download for the configured external provider."; fi',
+        'if [ "$$CONVERSATION_LLM_PROVIDER" = "ollama" ]; then ollama pull "$$OLLAMA_MODEL"; else echo "Skipping Ollama model download for the configured external provider."; fi',
       ]
     environment:
       CONVERSATION_LLM_PROVIDER: ${CONVERSATION_LLM_PROVIDER:-ollama}
@@ -138,9 +138,6 @@ services:
       CONVERSATION_LLM_PROVIDER: ${CONVERSATION_LLM_PROVIDER:-ollama}
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:2b}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
-      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-inclusionai/ling-3.2-flash:free}
       SEMANTIC_MODEL_PATH: /workspace/semantic/automotive/catalog.yaml
       CONVERSATION_PLAN_SCHEMA_PATH: /workspace/packages/cube-query/conversation-plan.v1.schema.json
     ports:

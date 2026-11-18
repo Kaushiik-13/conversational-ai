@@ -34,6 +34,38 @@ measures:
     description: Number of distinct manufacturers represented in visible catalog parts.
     aggregation: count_distinct
     expression: part.manufacturer
+  total_cost_usd:
+    description: Sum of recorded part costs in US dollars.
+    aggregation: sum
+    expression: part.cost_usd
+  average_cost_usd:
+    description: Average recorded part cost in US dollars.
+    aggregation: average
+    expression: part.cost_usd
+  min_cost_usd:
+    description: Lowest recorded part cost in US dollars.
+    aggregation: minimum
+    expression: part.cost_usd
+  max_cost_usd:
+    description: Highest recorded part cost in US dollars.
+    aggregation: maximum
+    expression: part.cost_usd
+  total_weight_kg:
+    description: Sum of recorded part weights in kilograms.
+    aggregation: sum
+    expression: part.weight_kg
+  average_weight_kg:
+    description: Average recorded part weight in kilograms.
+    aggregation: average
+    expression: part.weight_kg
+  min_weight_kg:
+    description: Lowest recorded part weight in kilograms.
+    aggregation: minimum
+    expression: part.weight_kg
+  max_weight_kg:
+    description: Highest recorded part weight in kilograms.
+    aggregation: maximum
+    expression: part.weight_kg
 
 dimensions:
   manufacturer:
@@ -42,6 +74,7 @@ dimensions:
     type: string
     groupable: true
     filterable: true
+    aliases: [maker, brand, manufacturer name, made by]
   commodity:
     description: Top-level commodity classification.
     expression: part.commodity
@@ -72,18 +105,21 @@ dimensions:
     type: string
     groupable: true
     filterable: true
+    aliases: [sub commodity, sub-commodity, product type, part type]
   vehicle_program:
     description: Vehicle program associated with the part; this is not a vehicle make.
     expression: part.vehicle_program
     type: string
     groupable: true
     filterable: true
+    aliases: [vehicle program, vehicle project, program]
   region:
     description: Region associated with the part record.
     expression: part.region
     type: string
     groupable: true
     filterable: true
+    aliases: [region, geography, market region]
     known_values:
       - Africa
       - Asia
@@ -98,18 +134,21 @@ dimensions:
     type: string
     groupable: true
     filterable: true
+    aliases: [country, nation]
   plant:
     description: Plant associated with the part record.
     expression: part.plant
     type: string
     groupable: true
     filterable: true
+    aliases: [plant, factory, facility]
   model_year:
     description: Model year associated with the part record.
     expression: part.model_year
     type: integer
     groupable: true
     filterable: true
+    aliases: [model year, model-year, vehicle year]
   lifecycle_status:
     description: Lifecycle status recorded on the part.
     expression: part.lifecycle_status
@@ -128,6 +167,41 @@ dimensions:
     type: boolean
     groupable: true
     filterable: true
+  material:
+    description: Material recorded for the catalog part.
+    expression: part.material
+    type: string
+    groupable: true
+    filterable: true
+    aliases: [material, made of, material type]
+  supplier_status:
+    description: Supplier status recorded for the catalog part.
+    expression: part.supplier_status
+    type: string
+    groupable: true
+    filterable: true
+    aliases: [supplier status, supplier state]
+  cost_usd:
+    description: Recorded part cost in US dollars. This is a catalog value, not a live quote.
+    expression: part.cost_usd
+    type: number
+    groupable: true
+    filterable: true
+    aliases: [cost, price in dollars, cost in usd]
+  weight_kg:
+    description: Recorded part weight in kilograms.
+    expression: part.weight_kg
+    type: number
+    groupable: true
+    filterable: true
+    aliases: [weight, mass, weight in kilograms]
+  document_version:
+    description: Version number of the source catalog document.
+    expression: part.document_version
+    type: integer
+    groupable: true
+    filterable: true
+    aliases: [document version, source version]
   category:
     description: Catalog category assigned to the part.
     expression: category.name
@@ -157,26 +231,74 @@ lookup_fields:
     expression: part.part_number
     filterable: true
     groupable: false
+    aliases: [part number, part no, sku]
   part_name:
+    description: Name or partial text in the catalog part name.
     expression: part.part_name
     filterable: true
     groupable: false
+    aliases: [part name, name]
+  description:
+    description: Text recorded in the part description; use contains for text searches.
+    expression: part.description
+    filterable: true
+    groupable: false
+    aliases: [description, details, text]
+  created_at:
+    description: When the catalog record was created; use an ISO date or timestamp.
+    expression: part.created_at
+    type: timestamp
+    filterable: true
+    groupable: false
+    aliases: [created, creation date, added on]
+  updated_at:
+    description: When the catalog record was last updated; use an ISO date or timestamp.
+    expression: part.updated_at
+    type: timestamp
+    filterable: true
+    groupable: false
+    aliases: [updated, last updated, modified on]
+
+record_fields:
+  part_number: { description: Catalog part number, type: string }
+  part_name: { description: Catalog part name, type: string }
+  description: { description: Catalog part description, type: string }
+  commodity: { description: Top-level commodity, type: string }
+  sub_commodity: { description: More specific commodity, type: string }
+  manufacturer: { description: Component manufacturer, type: string }
+  vehicle_program: { description: Associated vehicle program, type: string }
+  region: { description: Region on the catalog record, type: string }
+  country: { description: Country on the catalog record, type: string }
+  plant: { description: Plant on the catalog record, type: string }
+  model_year: { description: Associated model year, type: integer }
+  material: { description: Recorded part material, type: string }
+  lifecycle_status: { description: Part lifecycle status, type: string }
+  supplier_status: { description: Supplier status, type: string }
+  cost_usd: { description: Recorded cost in US dollars, type: number }
+  weight_kg: { description: Recorded weight in kilograms, type: number }
+  active: { description: Whether the catalog record is active, type: boolean }
+  document_version: { description: Source document version, type: integer }
+  created_at:
+    { description: When the catalog record was created, type: timestamp }
+  updated_at:
+    { description: When the catalog record was last updated, type: timestamp }
+  category: { description: Categories assigned to the part, type: "string[]" }
 
 excluded_fields:
-  - cost_usd
-  - supplier_status
-  - weight_kg
-  - description
   - tenant_id
   - company_id
   - security_domain_id
   - visibility_status
   - source_system
   - source_record_id
+  - id
+  - primary_category_id
 
 limits:
-  max_dimensions_per_query: 3
-  max_filters_per_query: 10
+  max_dimensions_per_query: 5
+  max_filters_per_query: 15
   default_result_limit: 50
   max_result_limit: 500
+  max_record_fields: 25
+  max_record_rows: 100
   read_only: true

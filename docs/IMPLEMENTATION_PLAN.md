@@ -1,88 +1,86 @@
 # Automotive Conversational AI PoC — Implementation Plan
 
-**Status:** PoC implementation in progress — governed query path, RBAC proof, first chat UI, and optional OpenRouter provider implemented
+**Status:** Local PoC implementation in progress — Ollama-led question planning, aggregate and part-detail queries, comparisons, and guarded category relationships
 **Reference:** Wren AI  
 **Foundation:** [automotive-search](https://github.com/Kaushiik-13/automotive-search)  
 **Approval rule:** No application-code changes until you approve the plan and the specific change set for each stage.
 
-## Current decisions — 2026-11-12
+## Current decisions — 2026-11-17
 
-- Keep Ollama as the default local model provider. OpenRouter is an explicitly
-  selected optional provider for deployment experiments; there is no silent
-  fallback between providers.
-- When OpenRouter is selected, the backend sends question text, relevant
-  semantic context, and sanitized query history to the external model provider.
-  Query result rows are not sent for planning. The API key stays server-side.
-  Use synthetic PoC data until provider data handling is reviewed for
-  organizational use.
+- Use Ollama as the only model provider for current local development. Do not
+  send user questions or catalog context to an external model API.
 - Keep the existing Angular/NestJS application, automotive PostgreSQL data,
   authentication, organization roles, and row-level security as the foundation.
 - Use the project-owned Cube Query JSON contract and QGen. Model output remains
   a proposal that is validated and compiled by backend code; it never supplies
   SQL, organization IDs, or role choices.
-- Prefer Ollama as the local model runtime. Choose the exact model only after
-  checking machine resources and that model's own license.
+- Let Ollama interpret open-ended wording as the primary planning path. Keep
+  exact shortcuts only for a few fully specified common questions. Validate
+  plans against the user's stated fields and filters, and ask a short follow-up
+  when the request is ambiguous.
 - Exclude Excel/DuckDB and RAG/document retrieval from the current PoC. They are
   deferred and require a separate scope decision before any work begins.
-- Keep cost, supplier status, weight, and source-tracking fields outside the
-  conversational semantic model for the initial PoC.
+- Support aggregate questions and bounded part-detail lookups. The reviewed
+  model covers all 21 catalog business/detail fields, including material,
+  supplier status, cost, weight, description, and record dates; organization
+  and security identifiers remain hidden.
+- Support cost and weight totals, averages, minimums, and maximums, plus up to
+  five grouping fields and fifteen filters. Part-detail results are capped at
+  100 rows.
+- The current cross-table business relationship is part-to-category via
+  `part_categories` and `categories`. Category filters use a safe `EXISTS`
+  subquery and category detail is returned without multiplying part rows.
+  Do not invent SQL joins for relationships the database does not define.
 
 ### Open-source components and license notes
 
-| Area               | PoC choice                             | License / boundary                                                                                                                             |
-| ------------------ | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Database           | Existing PostgreSQL with ParadeDB      | PostgreSQL uses its permissive PostgreSQL License. ParadeDB Community is AGPL-3.0; keep this visible when distributing or hosting the product. |
-| Model provider     | Ollama by default; OpenRouter optional | Ollama/model licensing is separate; OpenRouter is an external API and free-model usage is limited.                                             |
-| Semantic query     | Project-owned Cube Query and QGen      | Only approved semantic fields are exposed; all filters and limits are parameterized.                                                           |
-| Excel analytics    | Deferred                               | DuckDB is a possible later choice; no Excel ingestion or DuckDB service is in this PoC.                                                        |
-| Document retrieval | Deferred                               | No RAG, embeddings, vector index, or document ingestion in this PoC.                                                                           |
-| Packaging          | Docker Compose                         | Local services and data stay on the development machine by default.                                                                            |
+| Area               | PoC choice                        | License / boundary                                                                                                                             |
+| ------------------ | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Database           | Existing PostgreSQL with ParadeDB | PostgreSQL uses its permissive PostgreSQL License. ParadeDB Community is AGPL-3.0; keep this visible when distributing or hosting the product. |
+| Model provider     | Ollama only for local PoC         | Ollama and the selected model have separate license terms.                                                                                     |
+| Semantic query     | Project-owned Cube Query and QGen | Only approved semantic fields are exposed; all filters and limits are parameterized.                                                           |
+| Excel analytics    | Deferred                          | DuckDB is a possible later choice; no Excel ingestion or DuckDB service is in this PoC.                                                        |
+| Document retrieval | Deferred                          | No RAG, embeddings, vector index, or document ingestion in this PoC.                                                                           |
+| Packaging          | Docker Compose                    | Local services and data stay on the development machine by default.                                                                            |
 
 References: [PostgreSQL license](https://www.postgresql.org/about/licence/),
 [ParadeDB license](https://github.com/paradedb/paradedb/blob/main/LICENSE),
 [Ollama license](https://github.com/ollama/ollama/blob/master/LICENSE), and
 [Ollama local API](https://github.com/ollama/ollama/blob/main/docs/api/openai-compatibility.mdx).
 
-### Current implementation and test status
+### Current implementation and verification status
 
 - The automotive database contains five million generated rows on the D: drive.
-- The semantic model, Cube Query v1 schema, validator, and QGen prototype are
-  present locally. The Cube Query package has nine passing tests.
+- The semantic model, Cube Query v1 schema, validator, and QGen now cover 21
+  record fields, ten measures, up to five grouping fields, and fifteen filters.
 - Existing automotive-search validations for Phases 3, 4, 7, 8, and 9 pass.
 - Phases 5, 6, and 11 currently fail: Phase 5 has stale expectations for the
   number of development accounts; Phases 6 and 11 find that the seed did not
   populate expected field-access rules. These failures must be resolved before
   pushing. Changes to the separate automotive-search source repo require your
   approval first.
-- The authenticated `POST /api/v1/conversation/query` route is integrated with
-  the existing session, `catalog.read` permission, protected database context,
-  audit event, validator, and QGen. `POST /api/v1/conversation/ask` now accepts
-  natural-language questions. Clear common patterns for totals, region
-  breakdowns, manufacturer-by-region, sub-commodity, lifecycle status,
-  category, and exact part-number questions are mapped to Cube Query JSON
-  directly; open-ended questions use the configured provider. Ollama is the
-  default; OpenRouter is available only when explicitly selected. Every plan
-  goes through deterministic validation, QGen, and the protected database
-  path. The model does not write or execute SQL.
-- The OpenRouter adapter uses its chat-completions API with the plan schema and
-  validates every response through the existing server-side plan validator.
-  The example environment selects a free model for testing; model availability,
-  structured-output behavior, and quotas can change. Test the chosen model with
-  the golden questions before deployment.
+- The authenticated `POST /api/v1/conversation/query` route retains the session,
+  `catalog.read` permission, protected database context, audit event, validator,
+  and QGen. `POST /api/v1/conversation/ask` uses Ollama to understand open-ended
+  questions, propose aggregate or detail queries, and ask for clarification
+  when key information is missing. Explicit requested filters are checked
+  before execution. Model plans are validated; the model never writes or runs
+  SQL.
+- Part-detail results use a bounded record query. Aggregates can compare
+  manufacturers, materials, categories, regions, cost, weight, and other
+  approved fields. Category filtering uses a guarded subquery; no arbitrary
+  relationship or raw SQL is accepted.
 - A first Angular chat page is available at `/conversation`. It includes
   automotive starter questions, loading/error states, answers and result
   tables, and a compact interpretation trace. The browser keeps the current
-  page transcript and sends up to four prior successful questions with their
-  interpreted query plans for follow-up understanding. Result rows are not
-  included in model context, and every new plan is revalidated and reauthorized.
+  page transcript and sends up to four prior questions with their safe query
+  plans or clarification messages so follow-ups can carry context. Result rows
+  are not included in model context, and every new plan is revalidated and
+  reauthorized.
   Conversation history is not persisted across page sessions.
-- The current web and API containers are healthy. Manual browser sign-in and
-  chat use remain for the developer to verify. The local development account
-  bootstrap service currently exits because its Org A Analyst password no
-  longer matches the database after the password was changed; credentials were
-  not modified. To keep the running API and web available, they were started
-  without rerunning dependent startup jobs. Sync the local development password
-  before relying on a fresh full Compose startup.
+- The current web, API, PostgreSQL, and Ollama containers are healthy. The
+  five-million-row catalog remains in the local database volume. Manual browser
+  sign-in and question checks remain for the developer.
 
 ### Verified RBAC proof for the conversational ask endpoint
 
@@ -99,7 +97,7 @@ combination has been tested:
 The same organization-scoped behavior is enforced by the existing authenticated
 database path; the model does not choose an organization or role.
 
-### Current local verification
+### Prior local verification snapshots
 
 - API lint and build passed; API tests: 13 passed.
 - Cube Query package tests: 9 passed.
@@ -121,6 +119,15 @@ database path; the model does not choose an organization or role.
   before these fixes (17/22); the whole suite has not been rerun, and Org B
   totals were intentionally not retested. See the evaluation report for the
   measured results and remaining verification.
+
+### Current local verification — 2026-11-17
+
+- API and web production builds passed after the detail-query changes.
+- Compose configuration passed, and API, web, PostgreSQL, and Ollama containers
+  are healthy. The catalog still contains 5,000,000 parts.
+- Query-generator smoke checks passed for a multi-filter part-detail lookup
+  with category subquery and an aggregate manufacturer/category comparison.
+- The broader API, web, Cube Query, and golden-question suites were not rerun.
 
 ## Goal and architecture
 
@@ -406,13 +413,11 @@ docs/
   local-development.md
 ```
 
-Proposed runtime services for this PoC: existing web/API/PostgreSQL and either
-the local Ollama model server or an explicitly configured external model API.
+Runtime services for this local PoC: existing web/API/PostgreSQL and Ollama.
 Use persistent volumes for database data and local model weights. Keep Ollama
-on the internal Compose network; keep any OpenRouter key in backend-only
-deployment settings. Existing catalog app should still start if the model is
-unavailable; chat then reports that clearly. Document CPU operation; GPU
-support is optional and host-dependent.
+on the internal Compose network. Existing catalog app should still start if the
+model is unavailable; chat then reports that clearly. Document CPU operation;
+GPU support is optional and host-dependent.
 
 ## Approval-gated delivery stages
 
@@ -448,7 +453,7 @@ part of current PoC acceptance.
 1. Extend automotive-search and preserve PostgreSQL/ParadeDB, Angular, NestJS, authentication and RBAC.
 2. PostgreSQL is the only data source in the current PoC.
 3. Excel/DuckDB and RAG/hybrid capabilities are deferred and require a separate approval.
-4. Ollama is the default local runtime; OpenRouter is optional and requires data-handling review before organizational data is used.
+4. Ollama is the only model runtime in this local PoC.
 5. Begin with reviewed semantic files, not a full semantic-admin UI, unless you request it.
 6. Decide conversation persistence, file retention and semantic-definition approvers before implementing those features.
 7. Ground exact questions, measures, dimensions and role behavior in the actual schema/policies during Stage 1.

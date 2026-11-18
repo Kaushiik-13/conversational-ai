@@ -43,18 +43,38 @@
         "model": { "const": "automotive_catalog" },
         "measures": {
           "type": "array",
-          "items": { "enum": ["part_count", "manufacturer_count"] },
-          "minItems": 1,
+          "items": {
+            "enum": [
+              "part_count",
+              "manufacturer_count",
+              "total_cost_usd",
+              "average_cost_usd",
+              "min_cost_usd",
+              "max_cost_usd",
+              "total_weight_kg",
+              "average_weight_kg",
+              "min_weight_kg",
+              "max_weight_kg"
+            ]
+          },
+          "minItems": 0,
           "maxItems": 1
         },
         "dimensions": {
           "type": "array",
           "items": { "type": "string" },
-          "maxItems": 3
+          "maxItems": 5
+        },
+        "mode": { "enum": ["aggregate", "records"] },
+        "fields": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "maxItems": 25
         },
         "filters": {
           "type": "array",
-          "maxItems": 10,
+          "maxItems": 15,
           "items": {
             "type": "object",
             "additionalProperties": false,

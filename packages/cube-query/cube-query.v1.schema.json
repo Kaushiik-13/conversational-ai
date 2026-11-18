@@ -9,10 +9,24 @@
   "properties": {
     "version": { "const": 1 },
     "model": { "const": "automotive_catalog" },
+    "mode": { "enum": ["aggregate", "records"] },
     "measures": {
       "type": "array",
-      "items": { "const": "part_count" },
-      "minItems": 1,
+      "items": {
+        "enum": [
+          "part_count",
+          "manufacturer_count",
+          "total_cost_usd",
+          "average_cost_usd",
+          "min_cost_usd",
+          "max_cost_usd",
+          "total_weight_kg",
+          "average_weight_kg",
+          "min_weight_kg",
+          "max_weight_kg"
+        ]
+      },
+      "minItems": 0,
       "maxItems": 1
     },
     "dimensions": {
@@ -29,15 +43,51 @@
           "model_year",
           "lifecycle_status",
           "active",
-          "category"
+          "category",
+          "material",
+          "supplier_status",
+          "cost_usd",
+          "weight_kg",
+          "document_version"
         ]
       },
       "uniqueItems": true,
-      "maxItems": 3
+      "maxItems": 5
+    },
+    "fields": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "part_number",
+          "part_name",
+          "description",
+          "commodity",
+          "sub_commodity",
+          "manufacturer",
+          "vehicle_program",
+          "region",
+          "country",
+          "plant",
+          "model_year",
+          "material",
+          "lifecycle_status",
+          "supplier_status",
+          "cost_usd",
+          "weight_kg",
+          "active",
+          "document_version",
+          "created_at",
+          "updated_at",
+          "category"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 25,
+      "uniqueItems": true
     },
     "filters": {
       "type": "array",
-      "maxItems": 10,
+      "maxItems": 15,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -56,6 +106,14 @@
               "lifecycle_status",
               "active",
               "category",
+              "material",
+              "supplier_status",
+              "cost_usd",
+              "weight_kg",
+              "document_version",
+              "description",
+              "created_at",
+              "updated_at",
               "part_number",
               "part_name"
             ]
@@ -66,7 +124,7 @@
           "value": {
             "oneOf": [
               { "type": "string", "maxLength": 256 },
-              { "type": "integer" },
+              { "type": "number" },
               { "type": "boolean" },
               {
                 "type": "array",
@@ -75,7 +133,7 @@
                 "items": {
                   "oneOf": [
                     { "type": "string", "maxLength": 256 },
-                    { "type": "integer" },
+                    { "type": "number" },
                     { "type": "boolean" }
                   ]
                 }
@@ -96,6 +154,15 @@
           "field": {
             "enum": [
               "part_count",
+              "manufacturer_count",
+              "total_cost_usd",
+              "average_cost_usd",
+              "min_cost_usd",
+              "max_cost_usd",
+              "total_weight_kg",
+              "average_weight_kg",
+              "min_weight_kg",
+              "max_weight_kg",
               "manufacturer",
               "commodity",
               "sub_commodity",
@@ -106,7 +173,17 @@
               "model_year",
               "lifecycle_status",
               "active",
-              "category"
+              "category",
+              "material",
+              "supplier_status",
+              "cost_usd",
+              "weight_kg",
+              "document_version",
+              "part_number",
+              "part_name",
+              "description",
+              "created_at",
+              "updated_at"
             ]
           },
           "direction": { "enum": ["asc", "desc"] }
