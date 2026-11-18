@@ -57,12 +57,10 @@ test("compiles manufacturer_count as a distinct count and safely filters the bra
 
 test("rejects unknown fields, sensitive fields, identity fields, and raw SQL", () => {
   for (const input of [
-    { ...baseQuery, dimensions: ["cost_usd"] },
+    { ...baseQuery, dimensions: ["organization_id"] },
     {
       ...baseQuery,
-      filters: [
-        { field: "supplier_status", operator: "equals", value: "active" },
-      ],
+      filters: [{ field: "password_hash", operator: "equals", value: "x" }],
     },
     { ...baseQuery, organization_id: "org-b" },
     { ...baseQuery, sql: "SELECT * FROM catalog.part_catalog" },
@@ -93,7 +91,14 @@ test("rejects duplicate or excessive dimensions, invalid limits, and sorts on un
   assert.equal(
     validateCubeQuery({
       ...baseQuery,
-      dimensions: ["manufacturer", "region", "country", "plant"],
+      dimensions: [
+        "manufacturer",
+        "region",
+        "country",
+        "plant",
+        "material",
+        "commodity",
+      ],
     }).valid,
     false,
   );

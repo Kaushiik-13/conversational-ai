@@ -232,24 +232,34 @@ describe('QueryPlannerService', () => {
       filters: [{ field: 'active', operator: 'equals', value: true }],
     },
   ])(
-    'understands common automotive wording: $question',
+    'validates the local model plan for common wording: $question',
     async ({ question, measures, dimensions, filters }) => {
-      const fetchMock = jest
-        .spyOn(global, 'fetch')
-        .mockRejectedValue(new Error('unexpected local model request'));
+      const cubeQuery = {
+        version: 1,
+        model: 'automotive_catalog',
+        measures,
+        dimensions,
+        filters,
+        limit: 100,
+      };
+      const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            message: {
+              content: JSON.stringify({
+                status: 'query',
+                cube_query: cubeQuery,
+              }),
+            },
+          }),
+          { status: 200 },
+        ),
+      );
       const result = await new QueryPlannerService().plan(question);
       expect(result).toMatchObject({
         status: 'query',
-        cube_query: {
-          version: 1,
-          model: 'automotive_catalog',
-          measures,
-          dimensions,
-          filters,
-          limit: 100,
-        },
+        cube_query: cubeQuery,
       });
-      expect(fetchMock).not.toHaveBeenCalled();
       fetchMock.mockRestore();
     },
   );
@@ -304,16 +314,11 @@ describe('QueryPlannerService', () => {
     });
     const prompt = request.messages[0].content;
     expect(prompt).toContain('manufacturer');
-    expect(prompt).toContain('part_count can be grouped');
-    expect(prompt).toContain(
-      'For "active parts", add the boolean filter active equals true.',
-    );
-    expect(prompt).toContain('use model_year with an integer value');
-    expect(prompt).toContain('use part_number with operator equals');
-    expect(prompt).toContain(
-      'order_by [{"field":"part_count","direction":"desc"}]',
-    );
-    expect(prompt).toContain('Do not add filter-only fields as dimensions.');
+    expect(prompt).toContain('Never write SQL');
+    expect(prompt).toContain('Catalog contract:');
+    expect(prompt).toContain('"part_count"');
+    expect(prompt).toContain('"manufacturer_count"');
+    expect(prompt).toContain('mode=records');
     expect(prompt).not.toContain('part_catalog');
     expect(prompt).not.toContain('part.id');
     fetchMock.mockRestore();
