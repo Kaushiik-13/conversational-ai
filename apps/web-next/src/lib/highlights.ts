@@ -76,3 +76,15 @@ const DOMAIN_HUES: Hue[] = [
 /** Stable colour for a domain, so it matches everywhere it appears. */
 export const domainHue = (domainId: number): Hue =>
   DOMAIN_HUES[Math.abs(domainId) % DOMAIN_HUES.length];
+
+/** Underline colour for the selected domain tab. */
+export const HUE_UNDERLINE: Record<Hue, string> = {
+  blue: "border-hl-blue",
+  emerald: "border-hl-emerald",
+  amber: "border-hl-amber",
+  rose: "border-hl-rose",
+  violet: "border-hl-violet",
+  teal: "border-hl-teal",
+  orange: "border-hl-orange",
+  slate: "border-hl-slate",
+};

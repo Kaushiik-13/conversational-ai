@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
-  ChevronRight,
   Download,
   Loader2,
   Plus,
@@ -60,7 +59,7 @@ import {
   type EntitlementEntry,
 } from "./category-utils";
 import { FacetPanel, type FacetState, type Picked } from "./facet-panel";
-import { LevelsTree } from "./levels-tree";
+import { LevelsBar } from "./levels-bar";
 import { PartDrawer } from "./part-drawer";
 import { StatusBadge } from "./status-badge";
 
@@ -227,6 +226,12 @@ export function CatalogView() {
     [treeCurrent],
   );
   const index = useMemo(() => buildCategoryIndex(roots), [roots]);
+  // Entitlements can be granted on the hidden top level, so resolve them
+  // against the full tree.
+  const fullIndex = useMemo(
+    () => buildCategoryIndex(treeCurrent?.tree ?? []),
+    [treeCurrent],
+  );
 
   // Admins can read entitlements, which lets us lock levels their active
   // organization does not include. Other roles already get a limited tree.
@@ -258,8 +263,8 @@ export function CatalogView() {
     if (!canReadEntitlements || entitlementState?.key !== entitlementKey) {
       return null;
     }
-    return computeAllowedIds(entitlementState.entries, index);
-  }, [canReadEntitlements, entitlementState, entitlementKey, index]);
+    return computeAllowedIds(entitlementState.entries, fullIndex);
+  }, [canReadEntitlements, entitlementState, entitlementKey, fullIndex]);
 
   const debouncedQuery = useDebounced(query.trim(), 400);
   const debouncedYearFrom = useDebounced(yearFrom, 400);
@@ -496,360 +501,318 @@ export function CatalogView() {
     setSortKey(null);
   }
 
-  const selectedInfo = selectedNode ? index.get(selectedNode.id) : undefined;
   const hasConstraints =
     filterCount > 0 || selectedNode !== null || query.trim() !== "";
   const orgName =
     profile.activeContext?.organizationName ?? "your organization";
 
   const sidebar = (
-    <>
-      <LevelsTree
+    <FacetPanel
+      facets={facets}
+      picked={picked}
+      onToggle={toggleValue}
+      yearFrom={yearFrom}
+      yearTo={yearTo}
+      onYearFrom={setYearFrom}
+      onYearTo={setYearTo}
+      activeCount={filterCount}
+      onClear={clearFilters}
+    />
+  );
+
+  return (
+    <div className="flex h-full flex-col">
+      <LevelsBar
         roots={roots}
         index={index}
         selectedId={selectedNode?.id ?? null}
         loading={treeLoading}
         error={treeError}
         allowedIds={allowedIds}
-        onSelect={(node) => {
-          setSelectedNode(node);
-          setFiltersOpen(false);
-        }}
+        onSelect={setSelectedNode}
         onRetry={() => setTreeReload((value) => value + 1)}
       />
-      <FacetPanel
-        facets={facets}
-        picked={picked}
-        onToggle={toggleValue}
-        yearFrom={yearFrom}
-        yearTo={yearTo}
-        onYearFrom={setYearFrom}
-        onYearTo={setYearTo}
-        activeCount={filterCount}
-        onClear={clearFilters}
-      />
-    </>
-  );
 
-  return (
-    <div className="flex h-full">
-      <aside className="hidden w-72 shrink-0 overflow-y-auto border-r lg:block">
-        {sidebar}
-      </aside>
+      <div className="flex min-h-0 flex-1">
+        <aside className="hidden w-72 shrink-0 overflow-y-auto border-r lg:block">
+          {sidebar}
+        </aside>
 
-      <section className="flex min-w-0 flex-1 flex-col">
-        <div className="space-y-3 border-b p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <nav
-              aria-label="Breadcrumb"
-              className="flex min-w-0 flex-wrap items-center gap-1 text-sm"
-            >
-              <button
-                type="button"
-                onClick={() => setSelectedNode(null)}
-                className={
-                  selectedNode
-                    ? "text-muted-foreground hover:text-foreground"
-                    : "font-medium"
-                }
+        <section className="flex min-w-0 flex-1 flex-col">
+          <div className="space-y-3 border-b p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                className="lg:hidden"
+                onClick={() => setFiltersOpen(true)}
               >
-                Catalog
-              </button>
-              {selectedInfo?.trail.map((level, position) => {
-                const last = position === selectedInfo.trail.length - 1;
-                return (
-                  <span key={level.id} className="flex items-center gap-1">
-                    <ChevronRight
-                      className="size-3.5 text-muted-foreground"
-                      aria-hidden
-                    />
-                    {position === 0 ? (
-                      <span
-                        aria-hidden
-                        className={`size-2 rounded-full ${HUE_DOT[domainHue(selectedInfo.trail[0].id)]}`}
-                      />
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => setSelectedNode(level)}
-                      className={
-                        last
-                          ? "font-medium"
-                          : "text-muted-foreground hover:text-foreground"
-                      }
-                    >
-                      {level.name}
-                    </button>
+                <SlidersHorizontal /> Filters
+                {filterCount > 0 ? (
+                  <span className="rounded-full bg-hl-blue/12 px-1.5 font-mono text-[10px] text-hl-blue">
+                    {filterCount}
                   </span>
-                );
-              })}
-            </nav>
-            <div className="flex items-center gap-2">
+                ) : null}
+              </Button>
+              <div className="relative min-w-[12rem] flex-1">
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden
+                />
+                <Input
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search part number, name, material, maker…"
+                  aria-label="Search parts"
+                  className="h-10 pl-9"
+                />
+              </div>
+              <Select
+                value={effectiveSort}
+                onValueChange={(value) => setSortKey(value as SortKey)}
+              >
+                <SelectTrigger className="w-48" aria-label="Sort results">
+                  <SelectValue>
+                    {(value) => SORT_LABELS[value as SortKey]}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {sortOptions.map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {SORT_LABELS[key]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {has("catalog.export") ? (
-                <Button variant="outline" size="sm" disabled>
-                  <Download /> Export · soon
+                <Button
+                  variant="outline"
+                  disabled
+                  aria-label="Export (coming soon)"
+                >
+                  <Download />
+                  <span className="hidden sm:inline">Export · soon</span>
                 </Button>
               ) : null}
               {has("catalog.create") ? (
-                <Button size="sm" disabled>
-                  <Plus /> Add part · soon
+                <Button disabled aria-label="Add part (coming soon)">
+                  <Plus />
+                  <span className="hidden sm:inline">Add part · soon</span>
                 </Button>
               ) : null}
             </div>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              className="lg:hidden"
-              onClick={() => setFiltersOpen(true)}
-            >
-              <SlidersHorizontal /> Filters
-              {filterCount > 0 ? (
-                <span className="rounded-full bg-hl-blue/12 px-1.5 font-mono text-[10px] text-hl-blue">
-                  {filterCount}
-                </span>
-              ) : null}
-            </Button>
-            <div className="relative min-w-[12rem] flex-1">
-              <Search
-                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden
-              />
-              <Input
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search part number, name, material, maker…"
-                aria-label="Search parts"
-                className="h-10 pl-9"
-              />
-            </div>
-            <Select
-              value={effectiveSort}
-              onValueChange={(value) => setSortKey(value as SortKey)}
-            >
-              <SelectTrigger className="w-48" aria-label="Sort results">
-                <SelectValue>
-                  {(value) => SORT_LABELS[value as SortKey]}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {sortOptions.map((key) => (
-                  <SelectItem key={key} value={key}>
-                    {SORT_LABELS[key]}
-                  </SelectItem>
+            {chips.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {chips.map((chip) => (
+                  <button
+                    key={chip.key}
+                    type="button"
+                    onClick={chip.clear}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-hl-blue/25 bg-hl-blue/10 px-2.5 py-0.5 text-xs text-hl-blue"
+                  >
+                    {chip.label}
+                    <X className="size-3" aria-label={`Remove ${chip.label}`} />
+                  </button>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {chips.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2">
-              {chips.map((chip) => (
-                <button
-                  key={chip.key}
-                  type="button"
-                  onClick={chip.clear}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-hl-blue/25 bg-hl-blue/10 px-2.5 py-0.5 text-xs text-hl-blue"
-                >
-                  {chip.label}
-                  <X className="size-3" aria-label={`Remove ${chip.label}`} />
-                </button>
-              ))}
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                Clear filters
-              </Button>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="flex items-center justify-between gap-3 px-4 py-3 text-sm text-muted-foreground">
-            <span aria-live="polite">
-              {loading
-                ? slow
-                  ? `Searching ${orgName}'s records… this can take a few seconds`
-                  : "Searching…"
-                : meta
-                  ? `${meta.visibleHitCount.toLocaleString()} parts · ${(meta.queryTimeMs / 1000).toFixed(1)}s`
-                  : ""}
-            </span>
-            {loading ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
+                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              </div>
             ) : null}
           </div>
 
-          {error ? (
-            <div className="px-4">
-              <Alert variant="destructive" role="alert">
-                <AlertCircle />
-                <AlertTitle>The catalog couldn&apos;t be loaded</AlertTitle>
-                <AlertDescription className="space-y-2">
-                  <span>{error}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setReload((value) => value + 1)}
-                  >
-                    Try again
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            </div>
-          ) : loading && items.length === 0 ? (
-            <div className="space-y-2 px-4" aria-label="Loading parts">
-              {Array.from({ length: 8 }).map((_, row) => (
-                <Skeleton key={row} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : !loading && items.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 px-4 py-16 text-center">
-              <SearchX className="size-8 text-muted-foreground" aria-hidden />
-              <div>
-                <p className="font-medium">No parts match</p>
-                <p className="text-sm text-muted-foreground">
-                  Try a different search, level or filter.
-                </p>
-              </div>
-              {hasConstraints ? (
-                <Button variant="outline" onClick={clearAll}>
-                  Clear everything
-                </Button>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="flex items-center justify-between gap-3 px-4 py-3 text-sm text-muted-foreground">
+              <span aria-live="polite">
+                {loading
+                  ? slow
+                    ? `Searching ${orgName}'s records… this can take a few seconds`
+                    : "Searching…"
+                  : meta
+                    ? `${meta.visibleHitCount.toLocaleString()} parts · ${(meta.queryTimeMs / 1000).toFixed(1)}s`
+                    : ""}
+              </span>
+              {loading ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
               ) : null}
             </div>
-          ) : (
-            <div className={loading ? "opacity-60 transition-opacity" : ""}>
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="pl-4">Part number</TableHead>
-                      <TableHead>Part</TableHead>
-                      <TableHead>Level</TableHead>
-                      <TableHead>Maker</TableHead>
-                      <TableHead>Region</TableHead>
-                      <TableHead className="text-right">Year</TableHead>
-                      <TableHead className="pr-4">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {items.map((item) => {
-                      const info = index.get(item.primaryCategoryId);
-                      return (
-                        <TableRow
-                          key={item.id}
-                          className="cursor-pointer"
-                          onClick={() => setOpenPartId(item.id)}
-                        >
-                          <TableCell className="pl-4 font-mono text-xs">
-                            <button
-                              type="button"
-                              className="text-hl-blue underline-offset-4 hover:underline"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setOpenPartId(item.id);
-                              }}
-                            >
-                              {item.partNumber}
-                            </button>
-                          </TableCell>
-                          <TableCell className="max-w-xs">
-                            <p className="truncate font-medium">
-                              {item.partName}
-                            </p>
-                            <p className="truncate text-xs text-muted-foreground">
-                              {item.material}
-                            </p>
-                          </TableCell>
-                          <TableCell>
-                            <span className="flex items-center gap-2 text-sm">
-                              <span
-                                aria-hidden
-                                className={`size-2 shrink-0 rounded-full ${
-                                  info?.domain
-                                    ? HUE_DOT[domainHue(info.domain.id)]
-                                    : "bg-border"
-                                }`}
-                              />
-                              {info?.node.name ?? "—"}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {item.manufacturer}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {item.region}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-xs tabular-nums">
-                            {item.modelYear}
-                          </TableCell>
-                          <TableCell className="pr-4">
-                            <StatusBadge status={item.lifecycleStatus} />
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
 
-              <ul className="divide-y md:hidden">
-                {items.map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      onClick={() => setOpenPartId(item.id)}
-                      className="w-full space-y-1.5 px-4 py-3 text-left"
+            {error ? (
+              <div className="px-4">
+                <Alert variant="destructive" role="alert">
+                  <AlertCircle />
+                  <AlertTitle>The catalog couldn&apos;t be loaded</AlertTitle>
+                  <AlertDescription className="space-y-2">
+                    <span>{error}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setReload((value) => value + 1)}
                     >
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-xs text-hl-blue">
-                          {item.partNumber}
-                        </span>
-                        <StatusBadge status={item.lifecycleStatus} />
-                      </span>
-                      <span className="block font-medium">{item.partName}</span>
-                      <span className="block text-xs text-muted-foreground">
-                        {item.manufacturer} · {item.region} · {item.modelYear}
-                      </span>
-                    </button>
-                  </li>
+                      Try again
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              </div>
+            ) : loading && items.length === 0 ? (
+              <div className="space-y-2 px-4" aria-label="Loading parts">
+                {Array.from({ length: 8 }).map((_, row) => (
+                  <Skeleton key={row} className="h-12 w-full" />
                 ))}
-              </ul>
-
-              {moreError ? (
-                <p
-                  className="px-4 pt-3 text-center text-sm text-destructive"
-                  role="alert"
-                >
-                  {moreError}
-                </p>
-              ) : null}
-              {meta?.nextCursor ? (
-                <div className="flex justify-center p-4">
-                  <Button
-                    variant="outline"
-                    onClick={loadMore}
-                    disabled={loadingMore}
-                  >
-                    {loadingMore ? <Loader2 className="animate-spin" /> : null}
-                    {loadingMore ? "Loading" : "Load more"}
-                  </Button>
+              </div>
+            ) : !loading && items.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 px-4 py-16 text-center">
+                <SearchX className="size-8 text-muted-foreground" aria-hidden />
+                <div>
+                  <p className="font-medium">No parts match</p>
+                  <p className="text-sm text-muted-foreground">
+                    Try a different search, level or filter.
+                  </p>
                 </div>
-              ) : items.length > 0 ? (
-                <p className="p-4 text-center text-xs text-muted-foreground">
-                  End of results
-                </p>
-              ) : null}
-            </div>
-          )}
-        </div>
-      </section>
+                {hasConstraints ? (
+                  <Button variant="outline" onClick={clearAll}>
+                    Clear everything
+                  </Button>
+                ) : null}
+              </div>
+            ) : (
+              <div className={loading ? "opacity-60 transition-opacity" : ""}>
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="pl-4">Part number</TableHead>
+                        <TableHead>Part</TableHead>
+                        <TableHead>Level</TableHead>
+                        <TableHead>Maker</TableHead>
+                        <TableHead>Region</TableHead>
+                        <TableHead className="text-right">Year</TableHead>
+                        <TableHead className="pr-4">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {items.map((item) => {
+                        const info = index.get(item.primaryCategoryId);
+                        return (
+                          <TableRow
+                            key={item.id}
+                            className="cursor-pointer"
+                            onClick={() => setOpenPartId(item.id)}
+                          >
+                            <TableCell className="pl-4 font-mono text-xs">
+                              <button
+                                type="button"
+                                className="text-hl-blue underline-offset-4 hover:underline"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setOpenPartId(item.id);
+                                }}
+                              >
+                                {item.partNumber}
+                              </button>
+                            </TableCell>
+                            <TableCell className="max-w-xs">
+                              <p className="truncate font-medium">
+                                {item.partName}
+                              </p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {item.material}
+                              </p>
+                            </TableCell>
+                            <TableCell>
+                              <span className="flex items-center gap-2 text-sm">
+                                <span
+                                  aria-hidden
+                                  className={`size-2 shrink-0 rounded-full ${
+                                    info?.domain
+                                      ? HUE_DOT[domainHue(info.domain.id)]
+                                      : "bg-border"
+                                  }`}
+                                />
+                                {info?.node.name ?? "—"}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {item.manufacturer}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {item.region}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-xs tabular-nums">
+                              {item.modelYear}
+                            </TableCell>
+                            <TableCell className="pr-4">
+                              <StatusBadge status={item.lifecycleStatus} />
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <ul className="divide-y md:hidden">
+                  {items.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => setOpenPartId(item.id)}
+                        className="w-full space-y-1.5 px-4 py-3 text-left"
+                      >
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-xs text-hl-blue">
+                            {item.partNumber}
+                          </span>
+                          <StatusBadge status={item.lifecycleStatus} />
+                        </span>
+                        <span className="block font-medium">
+                          {item.partName}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          {item.manufacturer} · {item.region} · {item.modelYear}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+
+                {moreError ? (
+                  <p
+                    className="px-4 pt-3 text-center text-sm text-destructive"
+                    role="alert"
+                  >
+                    {moreError}
+                  </p>
+                ) : null}
+                {meta?.nextCursor ? (
+                  <div className="flex justify-center p-4">
+                    <Button
+                      variant="outline"
+                      onClick={loadMore}
+                      disabled={loadingMore}
+                    >
+                      {loadingMore ? (
+                        <Loader2 className="animate-spin" />
+                      ) : null}
+                      {loadingMore ? "Loading" : "Load more"}
+                    </Button>
+                  </div>
+                ) : items.length > 0 ? (
+                  <p className="p-4 text-center text-xs text-muted-foreground">
+                    End of results
+                  </p>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
 
       <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
         <SheetContent side="left" className="w-80 overflow-y-auto p-0">
           <SheetHeader className="sr-only">
-            <SheetTitle>Levels and filters</SheetTitle>
+            <SheetTitle>Filters</SheetTitle>
           </SheetHeader>
           {sidebar}
         </SheetContent>
