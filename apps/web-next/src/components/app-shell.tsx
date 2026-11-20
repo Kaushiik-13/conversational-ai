@@ -3,22 +3,12 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Boxes,
-  ChevronsUpDown,
-  KeyRound,
-  LogOut,
-  Menu,
-  MessagesSquare,
-  Network,
-  ScrollText,
-  ShieldCheck,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
+import { ChevronsUpDown, KeyRound, LogOut, Menu } from "lucide-react";
+import { AppRail } from "@/components/app-rail";
 import { BrandLogo } from "@/components/brand-logo";
+import { NAV, initials } from "@/components/nav-items";
+import { RoleBadge } from "@/components/role-badge";
 import { useSession } from "@/components/session-provider";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -40,84 +30,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { HUE_BADGE, roleHue, roleLabel } from "@/lib/highlights";
-
-interface NavItem {
-  label: string;
-  href: string;
-  icon: LucideIcon;
-  /** Capability the role needs to see this item. */
-  capability: string;
-  /** False while the page is not built yet. */
-  ready: boolean;
-}
-
-const NAV: NavItem[] = [
-  {
-    label: "Catalog",
-    href: "/catalog",
-    icon: Boxes,
-    capability: "catalog.search",
-    ready: true,
-  },
-  {
-    label: "Ask AI",
-    href: "/chat",
-    icon: MessagesSquare,
-    capability: "catalog.read",
-    ready: false,
-  },
-  {
-    label: "People",
-    href: "/users",
-    icon: Users,
-    capability: "organization.users.read",
-    ready: false,
-  },
-  {
-    label: "Organization access",
-    href: "/entitlements",
-    icon: ShieldCheck,
-    capability: "organization.entitlements.read",
-    ready: false,
-  },
-  {
-    label: "Taxonomy",
-    href: "/taxonomy",
-    icon: Network,
-    capability: "taxonomy.manage",
-    ready: false,
-  },
-  {
-    label: "Audit trail",
-    href: "/audit",
-    icon: ScrollText,
-    capability: "audit.read",
-    ready: false,
-  },
-];
-
-function initials(name: string): string {
-  return (
-    name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part.charAt(0).toUpperCase())
-      .join("") || "?"
-  );
-}
-
-function RoleBadge({ role }: { role: string }) {
-  return (
-    <Badge
-      variant="outline"
-      className={`font-mono text-[10px] font-medium tracking-wide uppercase ${HUE_BADGE[roleHue(role)]}`}
-    >
-      {roleLabel(role)}
-    </Badge>
-  );
-}
+import { roleLabel } from "@/lib/highlights";
 
 function OrganizationSwitcher() {
   const { profile, switchOrganization } = useSession();
@@ -283,9 +196,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-dvh overflow-hidden">
-      <aside className="hidden w-64 shrink-0 border-r bg-secondary/40 lg:block">
-        <SidebarContent />
-      </aside>
+      <AppRail />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4 lg:hidden">

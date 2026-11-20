@@ -8,6 +8,8 @@ const apiInternalUrl = process.env.API_INTERNAL_URL ?? "http://localhost:3000";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // The dev-tools badge sits over the bottom-left of the navigation rail.
+  devIndicators: false,
   experimental: {
     // Catalog searches over millions of rows can take a while on a cold database.
     proxyTimeout: 180_000,
