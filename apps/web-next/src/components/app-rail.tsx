@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Check, KeyRound, LogOut } from "lucide-react";
+import { useCompare } from "@/components/compare/use-compare";
 import { useSession } from "@/components/session-provider";
 import {
   NAV,
@@ -29,7 +30,15 @@ import { HUE_DOT, roleHue, roleLabel } from "@/lib/highlights";
 const ITEM =
   "relative flex size-10 items-center justify-center rounded-lg transition-colors";
 
-function RailLink({ item, active }: { item: NavItem; active: boolean }) {
+function RailLink({
+  item,
+  active,
+  badge = 0,
+}: {
+  item: NavItem;
+  active: boolean;
+  badge?: number;
+}) {
   const Icon = item.icon;
 
   if (!item.ready) {
@@ -74,8 +83,19 @@ function RailLink({ item, active }: { item: NavItem; active: boolean }) {
           />
         ) : null}
         <Icon className="size-5" aria-hidden />
+        {badge > 0 ? (
+          <span
+            aria-label={`${badge} selected`}
+            className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-hl-blue font-mono text-[10px] text-background"
+          >
+            {badge}
+          </span>
+        ) : null}
       </TooltipTrigger>
-      <TooltipContent side="right">{item.label}</TooltipContent>
+      <TooltipContent side="right">
+        {item.label}
+        {badge > 0 ? ` · ${badge} selected` : ""}
+      </TooltipContent>
     </Tooltip>
   );
 }
@@ -195,6 +215,7 @@ function AccountMenu() {
 /** Slim desktop navigation: icons only, labels on hover. */
 export function AppRail() {
   const { has } = useSession();
+  const { count: compareCount } = useCompare();
   const pathname = usePathname();
   const visible = NAV.filter((item) => has(item.capability));
   const main = visible.filter((item) => item.group === "main");
@@ -223,7 +244,12 @@ export function AppRail() {
         className="flex flex-1 flex-col items-center gap-1 pt-2"
       >
         {main.map((item) => (
-          <RailLink key={item.href} item={item} active={isActive(item)} />
+          <RailLink
+            key={item.href}
+            item={item}
+            active={isActive(item)}
+            badge={item.href === "/compare" ? compareCount : 0}
+          />
         ))}
         {manage.length > 0 ? (
           <>

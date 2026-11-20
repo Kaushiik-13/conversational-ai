@@ -1,5 +1,6 @@
 import {
   Boxes,
+  GitCompareArrows,
   MessagesSquare,
   Network,
   ScrollText,
@@ -35,6 +36,14 @@ export const NAV: NavItem[] = [
     icon: MessagesSquare,
     capability: "catalog.read",
     ready: false,
+    group: "main",
+  },
+  {
+    label: "Compare",
+    href: "/compare",
+    icon: GitCompareArrows,
+    capability: "catalog.read",
+    ready: true,
     group: "main",
   },
   {

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronsUpDown, KeyRound, LogOut, Menu } from "lucide-react";
 import { AppRail } from "@/components/app-rail";
+import { CompareTray } from "@/components/compare/compare-tray";
+import { useCompare } from "@/components/compare/use-compare";
 import { BrandLogo } from "@/components/brand-logo";
 import { NAV, initials, isNavActive } from "@/components/nav-items";
 import { RoleBadge } from "@/components/role-badge";
@@ -97,6 +99,7 @@ function OrganizationSwitcher() {
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { profile, has, signOut } = useSession();
   const pathname = usePathname();
+  const { count: compareCount } = useCompare();
   const items = NAV.filter((item) => has(item.capability));
   const role = profile.activeContext?.role ?? "";
 
@@ -142,6 +145,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             >
               <Icon className="size-4" aria-hidden />
               {item.label}
+              {item.href === "/compare" && compareCount > 0 ? (
+                <span className="ml-auto rounded-full bg-hl-blue px-1.5 font-mono text-[10px] text-background">
+                  {compareCount}
+                </span>
+              ) : null}
             </Link>
           );
         })}
@@ -196,6 +204,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-dvh overflow-hidden">
       <AppRail />
+      <CompareTray />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4 lg:hidden">

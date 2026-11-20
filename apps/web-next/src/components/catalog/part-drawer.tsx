@@ -164,6 +164,7 @@ export function PartDrawer({ partId, index, onClose }: PartDrawerProps) {
           <div className="border-t p-4">
             <Button
               className="w-full"
+              nativeButton={false}
               render={<Link href={`/catalog/${part.id}`} />}
             >
               Open full page <ArrowUpRight />

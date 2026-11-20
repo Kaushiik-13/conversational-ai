@@ -13,6 +13,7 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
+import { CompareCheckbox } from "@/components/compare/compare-checkbox";
 import { useSession } from "@/components/session-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -694,7 +695,10 @@ export function CatalogView() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="pl-4">Part number</TableHead>
+                        <TableHead className="w-10 pl-4">
+                          <span className="sr-only">Compare</span>
+                        </TableHead>
+                        <TableHead>Part number</TableHead>
                         <TableHead>Part</TableHead>
                         <TableHead>Level</TableHead>
                         <TableHead>Maker</TableHead>
@@ -712,7 +716,10 @@ export function CatalogView() {
                             className="cursor-pointer"
                             onClick={() => setOpenPartId(item.id)}
                           >
-                            <TableCell className="pl-4 font-mono text-xs">
+                            <TableCell className="w-10 pl-4">
+                              <CompareCheckbox part={item} />
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
                               <Link
                                 href={`/catalog/${item.id}`}
                                 className="text-hl-blue underline-offset-4 hover:underline"
@@ -763,11 +770,14 @@ export function CatalogView() {
 
                 <ul className="divide-y md:hidden">
                   {items.map((item) => (
-                    <li key={item.id}>
+                    <li key={item.id} className="flex items-start gap-2 pl-4">
+                      <span className="pt-3.5">
+                        <CompareCheckbox part={item} />
+                      </span>
                       <button
                         type="button"
                         onClick={() => setOpenPartId(item.id)}
-                        className="w-full space-y-1.5 px-4 py-3 text-left"
+                        className="min-w-0 flex-1 space-y-1.5 py-3 pr-4 pl-1 text-left"
                       >
                         <span className="flex items-center justify-between gap-2">
                           <span className="font-mono text-xs text-hl-blue">

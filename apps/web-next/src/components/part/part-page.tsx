@@ -7,9 +7,11 @@ import {
   ArrowLeft,
   Check,
   ChevronRight,
+  GitCompareArrows,
   Link2,
 } from "lucide-react";
 import { useCategoryIndex } from "@/components/catalog/use-category-index";
+import { useCompare } from "@/components/compare/use-compare";
 import { StatusBadge } from "@/components/catalog/status-badge";
 import { RelatedParts } from "@/components/part/related-parts";
 import { useSession } from "@/components/session-provider";
@@ -66,6 +68,7 @@ export function PartPage({ id }: { id: number }) {
   const { profile, has, orgVersion } = useSession();
   const { index } = useCategoryIndex();
   const [copied, setCopied] = useState(false);
+  const compare = useCompare();
   const key = `${orgVersion}:${id}`;
   const [state, setState] = useState<{
     key: string;
@@ -107,6 +110,7 @@ export function PartPage({ id }: { id: number }) {
 
   const current = state?.key === key ? state : null;
   const part = current?.part ?? null;
+  const inCompare = part ? compare.has(part.id) : false;
   const info = part ? index.get(part.primaryCategoryId) : undefined;
   const role = profile.activeContext?.role ?? "";
   const vehicleHref = part
@@ -202,6 +206,25 @@ export function PartPage({ id }: { id: number }) {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant={inCompare ? "secondary" : "outline"}
+                  disabled={!inCompare && compare.full}
+                  title={
+                    !inCompare && compare.full
+                      ? `You can compare up to ${compare.max} parts`
+                      : undefined
+                  }
+                  onClick={() =>
+                    compare.toggle({
+                      id: part.id,
+                      partNumber: part.partNumber,
+                      partName: part.partName,
+                    })
+                  }
+                >
+                  {inCompare ? <Check /> : <GitCompareArrows />}
+                  {inCompare ? "In compare" : "Add to compare"}
+                </Button>
                 <Button variant="outline" onClick={copyLink}>
                   {copied ? <Check /> : <Link2 />}
                   {copied ? "Link copied" : "Copy link"}
