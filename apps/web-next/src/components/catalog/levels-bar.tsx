@@ -1,9 +1,15 @@
 "use client";
 
-import { Lock } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Lock } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { CategoryNode } from "@/lib/catalog-types";
-import { HUE_BADGE, HUE_DOT, HUE_UNDERLINE, domainHue } from "@/lib/highlights";
+import { HUE_DOT, HUE_UNDERLINE, domainHue } from "@/lib/highlights";
 import type { CategoryInfo } from "./category-utils";
 
 interface LevelsBarProps {
@@ -18,8 +24,66 @@ interface LevelsBarProps {
   onRetry: () => void;
 }
 
-const SCROLL_ROW =
-  "flex items-center gap-1 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+const TAB_ROW =
+  "flex items-center gap-1 overflow-x-auto px-4 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+
+/** One step of the path, as a dropdown listing its siblings. */
+function LevelStep({
+  parent,
+  chosen,
+  isLocked,
+  onSelect,
+}: {
+  parent: CategoryNode;
+  chosen: CategoryNode | null;
+  isLocked: (node: CategoryNode) => boolean;
+  onSelect: (node: CategoryNode) => void;
+}) {
+  const children = parent.children ?? [];
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <button
+            type="button"
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm transition-colors hover:bg-muted ${
+              chosen ? "font-medium" : "text-muted-foreground"
+            }`}
+          />
+        }
+      >
+        {chosen ? chosen.name : `All ${parent.name}`}
+        <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="max-h-80 min-w-48 overflow-y-auto"
+      >
+        <DropdownMenuItem onClick={() => onSelect(parent)}>
+          <span className="flex-1">All {parent.name}</span>
+          {chosen === null ? <Check className="size-4" aria-hidden /> : null}
+        </DropdownMenuItem>
+        {children.map((child) => {
+          const locked = isLocked(child);
+          return (
+            <DropdownMenuItem
+              key={child.id}
+              disabled={locked}
+              onClick={() => onSelect(child)}
+            >
+              <span className="flex-1">{child.name}</span>
+              {locked ? (
+                <Lock className="size-3.5" aria-label="Locked" />
+              ) : chosen?.id === child.id ? (
+                <Check className="size-4" aria-hidden />
+              ) : null}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export function LevelsBar({
   roots,
@@ -35,22 +99,6 @@ export function LevelsBar({
     (selectedId === null ? undefined : index.get(selectedId))?.trail ?? [];
   const isLocked = (node: CategoryNode) =>
     allowedIds !== null && !allowedIds.has(node.id);
-
-  // One extra row for each open level that has children below it.
-  const subRows: Array<{
-    parent: CategoryNode;
-    items: CategoryNode[];
-    selected: number | null;
-  }> = [];
-  for (let depth = 0; depth < trail.length; depth += 1) {
-    const children = trail[depth].children ?? [];
-    if (children.length === 0) break;
-    subRows.push({
-      parent: trail[depth],
-      items: children,
-      selected: trail[depth + 1]?.id ?? null,
-    });
-  }
 
   if (loading) {
     return (
@@ -88,10 +136,19 @@ export function LevelsBar({
     );
   }
 
+  // Each open level that has children below it gets one dropdown step.
+  const steps: Array<{ parent: CategoryNode; chosen: CategoryNode | null }> =
+    [];
+  for (let depth = 0; depth < trail.length; depth += 1) {
+    if ((trail[depth].children ?? []).length === 0) break;
+    steps.push({ parent: trail[depth], chosen: trail[depth + 1] ?? null });
+  }
+  const domain = trail[0];
+
   return (
     <nav aria-label="Catalog levels" className="border-b">
-      {/* Top level: domains as tabs */}
-      <div className={`${SCROLL_ROW} pt-1`}>
+      {/* Domains as tabs */}
+      <div className={TAB_ROW}>
         <button
           type="button"
           onClick={() => onSelect(null)}
@@ -104,15 +161,15 @@ export function LevelsBar({
         >
           All
         </button>
-        {roots.map((domain) => {
-          const hue = domainHue(domain.id);
-          const selected = trail[0]?.id === domain.id;
-          const locked = isLocked(domain);
+        {roots.map((root) => {
+          const hue = domainHue(root.id);
+          const selected = domain?.id === root.id;
+          const locked = isLocked(root);
           return (
             <button
-              key={domain.id}
+              key={root.id}
               type="button"
-              onClick={() => !locked && onSelect(domain)}
+              onClick={() => !locked && onSelect(root)}
               aria-current={selected ? "true" : undefined}
               aria-disabled={locked || undefined}
               title={
@@ -128,48 +185,39 @@ export function LevelsBar({
                 aria-hidden
                 className={`size-2 rounded-full ${HUE_DOT[hue]}`}
               />
-              {domain.name}
+              {root.name}
               {locked ? <Lock className="size-3" aria-label="Locked" /> : null}
             </button>
           );
         })}
       </div>
 
-      {/* Lower levels: pills, one row per open level */}
-      {subRows.map((row) => {
-        const hue = domainHue(trail[0].id);
-        return (
-          <div key={row.parent.id} className={`${SCROLL_ROW} pb-2`}>
-            {[null, ...row.items].map((item) => {
-              const node = item ?? row.parent;
-              const selected =
-                item === null
-                  ? selectedId === row.parent.id
-                  : row.selected === item.id;
-              const locked = item !== null && isLocked(item);
-              return (
-                <button
-                  key={node.id + (item === null ? "-all" : "")}
-                  type="button"
-                  onClick={() => !locked && onSelect(node)}
-                  aria-pressed={selected}
-                  aria-disabled={locked || undefined}
-                  className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs whitespace-nowrap transition-colors ${
-                    selected
-                      ? HUE_BADGE[hue]
-                      : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-                  } ${locked ? "cursor-not-allowed opacity-45" : ""}`}
-                >
-                  {item === null ? `All ${row.parent.name}` : item.name}
-                  {locked ? (
-                    <Lock className="size-3" aria-label="Locked" />
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
-        );
-      })}
+      {/* Where you are: one line, each step is a dropdown */}
+      {domain ? (
+        <div className="flex items-center gap-0.5 overflow-x-auto border-t bg-secondary/40 px-4 py-1.5 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <span className="flex shrink-0 items-center gap-2 px-2 py-1 font-medium">
+            <span
+              aria-hidden
+              className={`size-2 rounded-full ${HUE_DOT[domainHue(domain.id)]}`}
+            />
+            {domain.name}
+          </span>
+          {steps.map((step) => (
+            <span key={step.parent.id} className="flex shrink-0 items-center">
+              <ChevronRight
+                className="size-3.5 text-muted-foreground"
+                aria-hidden
+              />
+              <LevelStep
+                parent={step.parent}
+                chosen={step.chosen}
+                isLocked={isLocked}
+                onSelect={onSelect}
+              />
+            </span>
+          ))}
+        </div>
+      ) : null}
     </nav>
   );
 }
