@@ -11,8 +11,8 @@ RUN npm ci --workspace=@automotive-search/web-next --include-workspace-root
 
 COPY apps/web-next apps/web-next
 
-ARG NEXT_PUBLIC_API_URL=http://localhost:3000
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ARG API_INTERNAL_URL=http://api:3000
+ENV API_INTERNAL_URL=$API_INTERNAL_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build --workspace=@automotive-search/web-next
