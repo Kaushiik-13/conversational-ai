@@ -13,6 +13,9 @@
   },
   "scripts": {
     "dev": "concurrently --names API,WEB --prefix-colors blue,green \"npm run start:dev --workspace=@automotive-search/api\" \"npm run start --workspace=@automotive-search/web\"",
+    "dev:local": "concurrently --names API,WEB --prefix-colors blue,green \"node scripts/dev-api.mjs\" \"node scripts/dev-next.mjs\"",
+    "dev:local:api": "node scripts/dev-api.mjs",
+    "dev:local:web": "node scripts/dev-next.mjs",
     "dev:api": "npm run start:dev --workspace=@automotive-search/api",
     "dev:web": "npm run start --workspace=@automotive-search/web",
     "db:migrate": "node --env-file=.env database/migrations/migrate.mjs",
