@@ -42,11 +42,37 @@ export function LoginForm() {
 
   return (
     <form onSubmit={onSubmit} noValidate className="w-full space-y-6">
-      <div className="space-y-1.5">
-        <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
-        <p className="text-sm text-muted-foreground">
-          Use the account your organization gave you.
-        </p>
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 max-md:snug:hidden">
+          <span
+            aria-hidden
+            className="flex size-11 items-center justify-center rounded-xl border bg-secondary font-mono text-lg leading-none"
+          >
+            &gt;
+            <span
+              className="motion-safe-anim ml-0.5 h-4 w-[2px] bg-signal"
+              style={{ animation: "caret-blink 1.1s steps(1) infinite" }}
+            />
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1 font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
+            <span className="relative flex size-1.5">
+              <span
+                className="motion-safe-anim absolute inline-flex size-full rounded-full bg-signal opacity-60"
+                style={{
+                  animation: "ping 1.8s cubic-bezier(0,0,0.2,1) infinite",
+                }}
+              />
+              <span className="relative inline-flex size-1.5 rounded-full bg-signal" />
+            </span>
+            Secure sign-in
+          </span>
+        </div>
+        <div className="space-y-1.5">
+          <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
+          <p className="text-sm text-muted-foreground">
+            Use the account your organization gave you.
+          </p>
+        </div>
       </div>
 
       {error ? (

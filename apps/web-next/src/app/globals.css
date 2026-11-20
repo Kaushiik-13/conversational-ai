@@ -8,6 +8,7 @@
 @custom-variant short (@media (max-height: 920px));
 @custom-variant tiny (@media (max-height: 600px));
 @custom-variant cramped (@media (max-height: 800px));
+@custom-variant snug (@media (max-height: 700px));
 
 @theme inline {
   --color-background: var(--background);
@@ -133,6 +134,14 @@
 }
 @keyframes caret-blink {
   50% {
+    opacity: 0;
+  }
+}
+
+@keyframes ping {
+  75%,
+  100% {
+    transform: scale(2.4);
     opacity: 0;
   }
 }
