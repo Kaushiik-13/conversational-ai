@@ -18,7 +18,13 @@ export function HomeView() {
 
   useEffect(() => {
     getProfile()
-      .then(setProfile)
+      .then((result) => {
+        if (result.mustChangePassword) {
+          router.replace("/change-password");
+          return;
+        }
+        setProfile(result);
+      })
       .catch((error) => {
         if (error instanceof ApiError && error.status === 401) {
           router.replace("/login");

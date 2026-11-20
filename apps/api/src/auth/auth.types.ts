@@ -33,4 +33,5 @@ export interface AuthProfile {
   } | null;
   memberships: MembershipProfile[];
   capabilities: string[];
+  mustChangePassword: boolean;
 }

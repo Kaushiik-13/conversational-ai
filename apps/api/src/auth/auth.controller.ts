@@ -11,7 +11,9 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AccessSessionGuard } from './access-session.guard';
+import { AllowWhilePasswordChangeRequired } from './allow-password-change.decorator';
 import { AuthService } from './auth.service';
+import { ChangePasswordDto } from './change-password.dto';
 import { LoginDto } from './login.dto';
 import { OrganizationContextDto } from './organization-context.dto';
 
@@ -44,9 +46,26 @@ export class AuthController {
   }
 
   @Get('me')
+  @AllowWhilePasswordChangeRequired()
   @UseGuards(AccessSessionGuard)
   async me(@Req() request: Request) {
     return { data: await this.authService.me(request.auth!) };
+  }
+
+  @Put('password')
+  @AllowWhilePasswordChangeRequired()
+  @UseGuards(AccessSessionGuard)
+  async changePassword(
+    @Body() input: ChangePasswordDto,
+    @Req() request: Request,
+  ) {
+    return {
+      data: await this.authService.changePassword(
+        request.auth!,
+        input,
+        request,
+      ),
+    };
   }
 
   @Put('organization-context')
@@ -67,6 +86,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @AllowWhilePasswordChangeRequired()
   @UseGuards(AccessSessionGuard)
   @HttpCode(204)
   async logout(
@@ -77,6 +97,7 @@ export class AuthController {
   }
 
   @Post('logout-all')
+  @AllowWhilePasswordChangeRequired()
   @UseGuards(AccessSessionGuard)
   @HttpCode(204)
   async logoutAll(

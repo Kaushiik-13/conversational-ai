@@ -209,7 +209,7 @@ try {
         }
 
         const credential = await client.query(
-          "SELECT password_hash FROM app.user_credentials WHERE user_id = $1",
+          "SELECT password_hash, must_change_password FROM app.user_credentials WHERE user_id = $1",
           [account.id],
         );
         if (credential.rowCount !== 1) {
@@ -217,7 +217,10 @@ try {
             `Development account ${account.email} has no credential.`,
           );
         }
+        // Once the user has chosen their own password it intentionally differs
+        // from the seeded value, so only verify accounts still on the seed.
         if (
+          credential.rows[0].must_change_password &&
           !(await argon2.verify(
             credential.rows[0].password_hash,
             passwordFor(account),

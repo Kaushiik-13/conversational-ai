@@ -5,6 +5,7 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   OnModuleInit,
@@ -23,6 +24,7 @@ import {
   REFRESH_COOKIE,
 } from './auth.constants';
 import { AuthConfig } from './auth.config';
+import { ChangePasswordDto } from './change-password.dto';
 import { LoginDto } from './login.dto';
 import { LoginRateLimiter } from './login-rate-limiter.service';
 import {
@@ -357,6 +359,103 @@ export class AuthService implements OnModuleInit {
     return profile;
   }
 
+  async mustChangePassword(userId: string): Promise<boolean> {
+    const result = await this.database.query<{
+      auth_password_state: boolean;
+    }>('SELECT security.auth_password_state($1)', [userId]);
+    return result.rows[0]?.auth_password_state ?? false;
+  }
+
+  async changePassword(
+    session: AuthenticatedSession,
+    input: ChangePasswordDto,
+    request: Request,
+  ): Promise<AuthProfile> {
+    this.verifySessionCsrf(request, session);
+
+    const candidateResult =
+      await this.database.query<AuthenticationCandidateRow>(
+        'SELECT * FROM security.auth_lookup_user($1::citext)',
+        [session.email],
+      );
+    const candidate = candidateResult.rows[0];
+    const currentMatches =
+      !!candidate &&
+      (await argon2.verify(candidate.password_hash, input.currentPassword));
+
+    if (!candidate || !currentMatches) {
+      if (candidate) {
+        await this.database.query(
+          'SELECT * FROM security.auth_record_failure($1, $2, $3)',
+          [
+            candidate.user_id,
+            this.config.loginAccountLimit,
+            this.config.loginWindowSeconds,
+          ],
+        );
+      }
+      await this.audit(
+        request,
+        session.userId,
+        null,
+        session.sessionId,
+        'auth.password-change',
+        'deny',
+        { reason: 'current-password-incorrect' },
+      );
+      throw new BadRequestException({
+        code: 'CURRENT_PASSWORD_INCORRECT',
+        message: 'Your current password is incorrect.',
+      });
+    }
+
+    if (input.newPassword === input.currentPassword) {
+      throw new BadRequestException({
+        code: 'PASSWORD_UNCHANGED',
+        message: 'Choose a password different from your current one.',
+      });
+    }
+    if (input.newPassword.toLowerCase().includes(session.email.toLowerCase())) {
+      throw new BadRequestException({
+        code: 'PASSWORD_TOO_PREDICTABLE',
+        message: 'Your password must not contain your email address.',
+      });
+    }
+
+    const newHash = await argon2.hash(input.newPassword, {
+      type: argon2.argon2id,
+      memoryCost: 19_456,
+      timeCost: 2,
+      parallelism: 1,
+    });
+    const changed = await this.database.query<{
+      auth_change_password: boolean;
+    }>('SELECT security.auth_change_password($1, $2, $3)', [
+      session.userId,
+      session.sessionId,
+      newHash,
+    ]);
+    if (!changed.rows[0]?.auth_change_password) {
+      throw this.authenticationRequired();
+    }
+
+    await this.audit(
+      request,
+      session.userId,
+      null,
+      session.sessionId,
+      'auth.password-change',
+      'allow',
+      {},
+    );
+    return this.profileFor(
+      session.sessionId,
+      session.userId,
+      session.email,
+      session.displayName,
+    );
+  }
+
   async me(session: AuthenticatedSession): Promise<AuthProfile> {
     return this.profileFor(
       session.sessionId,
@@ -496,7 +595,12 @@ export class AuthService implements OnModuleInit {
       [sessionId, userId],
     );
 
+    const passwordState = await this.database.query<{
+      auth_password_state: boolean;
+    }>('SELECT security.auth_password_state($1)', [userId]);
+
     return {
+      mustChangePassword: passwordState.rows[0]?.auth_password_state ?? false,
       user: { id: userId, email, displayName },
       activeContext: active
         ? {

@@ -20,6 +20,7 @@ export interface AuthProfile {
     role: string;
   } | null;
   capabilities: string[];
+  mustChangePassword: boolean;
 }
 
 function readCookie(name: string): string | undefined {
@@ -69,6 +70,12 @@ export async function login(
     body: { email, password },
   });
 }
+
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  apiRequest<AuthProfile>("/auth/password", {
+    method: "PUT",
+    body: { currentPassword, newPassword },
+  });
 
 export const getProfile = () => apiRequest<AuthProfile>("/auth/me");
 export const logout = () =>

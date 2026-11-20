@@ -27,8 +27,8 @@ export function LoginForm() {
     setLoading(true);
     setError("");
     try {
-      await login(email.trim(), password);
-      router.push("/");
+      const profile = await login(email.trim(), password);
+      router.push(profile.mustChangePassword ? "/change-password" : "/");
     } catch (failure) {
       setError(
         failure instanceof Error
