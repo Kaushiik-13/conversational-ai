@@ -5,6 +5,7 @@
   "description": "Conversational analytics product: NestJS API, web app, Cube Query and semantic layer",
   "workspaces": [
     "apps/web",
+    "apps/web-next",
     "apps/api"
   ],
   "engines": {

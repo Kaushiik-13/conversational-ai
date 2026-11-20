@@ -126,7 +126,7 @@ services:
       DATABASE_URL: postgresql://${APP_DATABASE_USER:-automotive_app}:${APP_DATABASE_PASSWORD:?Set APP_DATABASE_PASSWORD in .env}@db:5432/${POSTGRES_DB:-automotive_search}
       ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:?Set ACCESS_TOKEN_SECRET in .env}
       REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:?Set REFRESH_TOKEN_SECRET in .env}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:4200}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:4200,http://localhost:4300}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       ACCESS_TOKEN_TTL_SECONDS: ${ACCESS_TOKEN_TTL_SECONDS:-900}
       REFRESH_IDLE_TTL_SECONDS: ${REFRESH_IDLE_TTL_SECONDS:-604800}
@@ -176,6 +176,31 @@ services:
         [
           "CMD-SHELL",
           "wget -q -O - http://127.0.0.1:8080/health | grep -q '^ok$'",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  web-next:
+    build:
+      context: .
+      dockerfile: apps/web-next/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:${API_PORT:-3000}
+    ports:
+      - "${WEB_NEXT_PORT:-4300}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then(response => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1));",
         ]
       interval: 5s
       timeout: 5s
