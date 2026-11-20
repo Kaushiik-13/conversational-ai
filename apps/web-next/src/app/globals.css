@@ -7,6 +7,7 @@
 /* Height-based variants so full-screen pages fit without scrolling. */
 @custom-variant short (@media (max-height: 920px));
 @custom-variant tiny (@media (max-height: 600px));
+@custom-variant cramped (@media (max-height: 800px));
 
 @theme inline {
   --color-background: var(--background);

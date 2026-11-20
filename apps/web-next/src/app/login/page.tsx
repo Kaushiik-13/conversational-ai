@@ -23,9 +23,9 @@ export default function LoginPage() {
           </span>
         </header>
 
-        <div className="grid flex-1 md:grid-cols-[1.25fr_1fr] lg:grid-cols-[1.4fr_1fr] lg:grid-rows-[1fr_auto]">
-          <section className="min-w-0 space-y-6 border-b p-6 md:border-r lg:border-b-0 lg:p-10 short:lg:p-6">
-            <h1 className="text-[clamp(2.5rem,min(7vw,9vh),5.5rem)] leading-[0.95] font-semibold tracking-[-0.045em] text-balance">
+        <div className="grid flex-1 max-md:content-center md:grid-cols-[1.25fr_1fr] lg:grid-cols-[1.4fr_1fr] lg:grid-rows-[auto_1fr]">
+          <section className="flex min-w-0 flex-col justify-center space-y-6 border-b p-6 md:border-r lg:justify-start lg:border-b-0 lg:p-10 short:lg:p-6">
+            <h1 className="text-[clamp(2.5rem,min(5vw,9vh),5.5rem)] lg:text-[clamp(2.5rem,min(6vw,9vh),5.5rem)] leading-[0.95] font-semibold tracking-[-0.045em] text-balance">
               Ask your data.
               <br />
               <span className="text-muted-foreground">
@@ -41,7 +41,7 @@ export default function LoginPage() {
             <LoginForm />
           </section>
 
-          <div className="hidden min-w-0 p-6 tiny:hidden md:col-span-2 md:block lg:col-span-1 lg:col-start-1 lg:row-start-2 lg:self-end lg:p-10 lg:pt-0 short:lg:p-6 short:lg:pt-0">
+          <div className="hidden min-w-0 p-6 tiny:hidden max-lg:cramped:hidden md:col-span-2 md:block lg:col-span-1 lg:col-start-1 lg:row-start-2 lg:self-center lg:p-10 lg:pt-0 short:lg:p-6 short:lg:pt-0">
             <ConversationDemo />
           </div>
         </div>
