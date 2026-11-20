@@ -33,7 +33,7 @@ services:
     entrypoint: ["sh", "-c"]
     command:
       [
-        'if [ "$$CONVERSATION_LLM_PROVIDER" = "ollama" ]; then ollama pull "$$OLLAMA_MODEL"; else echo "Skipping Ollama model download for the configured external provider."; fi',
+        'if [ "$$CONVERSATION_LLM_PROVIDER" = "ollama" ]; then ollama show "$$OLLAMA_MODEL" >/dev/null 2>&1 || ollama pull "$$OLLAMA_MODEL"; else echo "Skipping Ollama model download for the configured external provider."; fi',
       ]
     environment:
       CONVERSATION_LLM_PROVIDER: ${CONVERSATION_LLM_PROVIDER:-ollama}
