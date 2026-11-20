@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,11 +41,11 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate className="w-full max-w-sm space-y-8">
-      <div className="space-y-2">
-        <h2 className="font-display text-5xl leading-none">Welcome back</h2>
-        <p className="text-muted-foreground">
-          Sign in with the account your organization gave you.
+    <form onSubmit={onSubmit} noValidate className="w-full space-y-6">
+      <div className="space-y-1.5">
+        <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
+        <p className="text-sm text-muted-foreground">
+          Use the account your organization gave you.
         </p>
       </div>
 
@@ -57,15 +57,15 @@ export function LoginForm() {
         </Alert>
       ) : null}
 
-      <div className="space-y-5">
+      <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="email">Work email</Label>
+          <Label htmlFor="email">Email</Label>
           <Input
             id="email"
             type="email"
             autoComplete="username"
             placeholder="you@company.com"
-            className="h-11"
+            className="h-10"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
@@ -78,7 +78,7 @@ export function LoginForm() {
               id="password"
               type={showPassword ? "text" : "password"}
               autoComplete="current-password"
-              className="h-11 pr-11"
+              className="h-10 pr-10"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               required
@@ -87,7 +87,7 @@ export function LoginForm() {
               type="button"
               variant="ghost"
               size="icon"
-              className="absolute top-1 right-1 size-9 text-muted-foreground"
+              className="absolute top-0.5 right-0.5 size-9 text-muted-foreground"
               aria-label={showPassword ? "Hide password" : "Show password"}
               onClick={() => setShowPassword((value) => !value)}
             >
@@ -99,13 +99,11 @@ export function LoginForm() {
 
       <Button
         type="submit"
-        size="lg"
-        className="h-11 w-full"
+        className="h-10 w-full"
         disabled={loading || !email || !password}
       >
         {loading ? <Loader2 className="animate-spin" /> : null}
         {loading ? "Signing in" : "Continue"}
-        {loading ? null : <ArrowRight />}
       </Button>
     </form>
   );

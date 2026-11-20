@@ -102,7 +102,7 @@ export function ConversationDemo() {
 
   return (
     <div
-      className="w-full max-w-xl rounded-lg border bg-card shadow-[0_1px_0_0_var(--border),0_24px_48px_-32px_oklch(0.2_0.02_60/0.35)]"
+      className="w-full max-w-xl rounded-lg border bg-card"
       aria-label="Example conversation"
       role="img"
     >
@@ -115,12 +115,12 @@ export function ConversationDemo() {
       </div>
 
       <div className="space-y-5 p-5">
-        <p className="min-h-14 font-display text-2xl leading-snug">
+        <p className="min-h-14 text-xl leading-snug font-medium tracking-tight">
           {question}
           {!reduced && phase === "typing" ? (
             <span
               aria-hidden
-              className="motion-safe-anim ml-0.5 inline-block h-5 w-px translate-y-0.5 bg-foreground"
+              className="motion-safe-anim ml-0.5 inline-block h-5 w-[2px] translate-y-0.5 bg-signal"
               style={{ animation: "caret-blink 1s steps(1) infinite" }}
             />
           ) : null}
