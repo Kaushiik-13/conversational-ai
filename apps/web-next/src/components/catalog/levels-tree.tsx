@@ -149,7 +149,7 @@ export function LevelsTree({
     });
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-col">
       <div className="flex items-center gap-2 px-4 pt-4 pb-2">
         <Layers className="size-4 text-muted-foreground" aria-hidden />
         <h2 className="font-mono text-[11px] tracking-wide text-muted-foreground uppercase">
@@ -157,7 +157,7 @@ export function LevelsTree({
         </h2>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+      <div className="max-h-80 overflow-y-auto px-2 pb-3">
         <button
           type="button"
           onClick={() => onSelect(null)}

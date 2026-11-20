@@ -49,9 +49,34 @@ export interface SearchMeta {
 export interface SearchFilters {
   securityDomainIds?: number[];
   primaryCategoryIds?: number[];
+  manufacturerNames?: string[];
   regions?: string[];
+  materials?: string[];
   lifecycleStatuses?: string[];
   modelYears?: { from?: number; to?: number };
+}
+
+/** Filter groups that show counts ("facets") next to each value. */
+export type FacetName =
+  "manufacturer" | "region" | "material" | "lifecycleStatus";
+
+export const FACET_NAMES: FacetName[] = [
+  "lifecycleStatus",
+  "manufacturer",
+  "region",
+  "material",
+];
+
+export const FACET_LABELS: Record<FacetName, string> = {
+  manufacturer: "Manufacturer",
+  region: "Region",
+  material: "Material",
+  lifecycleStatus: "Status",
+};
+
+export interface FacetBucket {
+  value: string;
+  count: number;
 }
 
 export type SortField = "relevance" | "partNumber" | "modelYear" | "updatedAt";
@@ -59,7 +84,7 @@ export type SortField = "relevance" | "partNumber" | "modelYear" | "updatedAt";
 export interface SearchRequest {
   query: string;
   filters?: SearchFilters;
-  facets: string[];
+  facets: FacetName[];
   sort: { field: SortField; direction: "asc" | "desc" };
   limit: number;
   cursor?: string;

@@ -5,11 +5,11 @@ import {
   AlertCircle,
   ChevronRight,
   Download,
-  Layers,
   Loader2,
   Plus,
   Search,
   SearchX,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
 import { useSession } from "@/components/session-provider";
@@ -40,9 +40,12 @@ import {
 } from "@/components/ui/table";
 import { apiRequest, apiRequestFull } from "@/lib/api";
 import {
-  LIFECYCLE_STATUSES,
-  REGIONS,
+  FACET_LABELS,
+  FACET_NAMES,
   type CategoryNode,
+  type FacetBucket,
+  type FacetName,
+  type SearchFilters,
   type SearchItem,
   type SearchMeta,
   type SearchRequest,
@@ -56,12 +59,12 @@ import {
   visibleRoots,
   type EntitlementEntry,
 } from "./category-utils";
+import { FacetPanel, type FacetState, type Picked } from "./facet-panel";
 import { LevelsTree } from "./levels-tree";
 import { PartDrawer } from "./part-drawer";
 import { StatusBadge } from "./status-badge";
 
 const PAGE_SIZE = 25;
-const ALL = "all";
 
 type SortKey =
   | "relevance"
@@ -76,6 +79,20 @@ const SORT_LABELS: Record<SortKey, string> = {
   "partNumber:desc": "Part number Z–A",
   "updatedAt:desc": "Recently updated",
   "modelYear:desc": "Newest model year",
+};
+
+const FILTER_KEY: Record<FacetName, keyof SearchFilters> = {
+  manufacturer: "manufacturerNames",
+  region: "regions",
+  material: "materials",
+  lifecycleStatus: "lifecycleStatuses",
+};
+
+const EMPTY_PICKED: Picked = {
+  manufacturer: [],
+  region: [],
+  material: [],
+  lifecycleStatus: [],
 };
 
 function useDebounced<T>(value: T, delayMs: number): T {
@@ -94,6 +111,69 @@ function parseYear(value: string): number | undefined {
     : undefined;
 }
 
+/**
+ * Counts for one filter group. Each group loads on its own so the results
+ * table never waits for counts. The API ignores a group's own filter when
+ * counting it, so ticking several values in one group keeps showing the others.
+ */
+function useFacet(
+  name: FacetName,
+  query: string,
+  filtersJson: string,
+  scope: string,
+  enabled: boolean,
+): FacetState {
+  const [reload, setReload] = useState(0);
+  const key = `${scope}:${reload}:${query}:${filtersJson}`;
+  const [state, setState] = useState<{
+    key: string;
+    buckets: FacetBucket[];
+    error: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const controller = new AbortController();
+    apiRequestFull<{ facets: Partial<Record<FacetName, FacetBucket[]>> }>(
+      "/search",
+      {
+        method: "POST",
+        signal: controller.signal,
+        body: {
+          query,
+          filters: JSON.parse(filtersJson) as SearchFilters,
+          facets: [name],
+          sort: { field: "partNumber", direction: "asc" },
+          limit: 1,
+        },
+      },
+    )
+      .then((response) =>
+        setState({
+          key,
+          buckets: response.data.facets?.[name] ?? [],
+          error: false,
+        }),
+      )
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setState((current) => ({
+          key,
+          buckets: current?.buckets ?? [],
+          error: true,
+        }));
+      });
+    return () => controller.abort();
+  }, [key, name, query, filtersJson, enabled]);
+
+  return {
+    buckets: state?.buckets ?? null,
+    loading: state?.key !== key,
+    error: state?.key === key && state.error,
+    retry: () => setReload((value) => value + 1),
+  };
+}
+
 export function CatalogView() {
   const { profile, has, orgVersion } = useSession();
 
@@ -109,15 +189,19 @@ export function CatalogView() {
     org: number;
     node: CategoryNode | null;
   }>({ org: 0, node: null });
-  const [levelsOpen, setLevelsOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const selectedNode = selection.org === orgVersion ? selection.node : null;
   const setSelectedNode = (node: CategoryNode | null) =>
     setSelection({ org: orgVersion, node });
 
   // Search controls
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState(ALL);
-  const [region, setRegion] = useState(ALL);
+  const [pickedState, setPickedState] = useState<{
+    org: number;
+    value: Picked;
+  }>({ org: 0, value: EMPTY_PICKED });
+  const picked =
+    pickedState.org === orgVersion ? pickedState.value : EMPTY_PICKED;
   const [yearFrom, setYearFrom] = useState("");
   const [yearTo, setYearTo] = useState("");
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
@@ -134,6 +218,15 @@ export function CatalogView() {
   const [moreError, setMoreError] = useState("");
   const [reload, setReload] = useState(0);
   const [openPartId, setOpenPartId] = useState<number | null>(null);
+
+  const treeCurrent = treeState?.key === treeKey ? treeState : null;
+  const treeLoading = !treeCurrent;
+  const treeError = treeCurrent?.error ?? "";
+  const roots = useMemo(
+    () => visibleRoots(treeCurrent?.tree ?? []),
+    [treeCurrent],
+  );
+  const index = useMemo(() => buildCategoryIndex(roots), [roots]);
 
   // Admins can read entitlements, which lets us lock levels their active
   // organization does not include. Other roles already get a limited tree.
@@ -161,32 +254,20 @@ export function CatalogView() {
     return () => controller.abort();
   }, [canReadEntitlements, organizationId, entitlementKey]);
 
-  const treeCurrent = treeState?.key === treeKey ? treeState : null;
-  const treeLoading = !treeCurrent;
-  const treeError = treeCurrent?.error ?? "";
-  const roots = useMemo(
-    () => visibleRoots(treeCurrent?.tree ?? []),
-    [treeCurrent],
-  );
-  const index = useMemo(() => buildCategoryIndex(roots), [roots]);
   const allowedIds = useMemo(() => {
     if (!canReadEntitlements || entitlementState?.key !== entitlementKey) {
       return null;
     }
-    const allowed = computeAllowedIds(entitlementState.entries, index);
-    // Everything not allowed is locked; build the set of allowed ids to test.
-    return allowed;
+    return computeAllowedIds(entitlementState.entries, index);
   }, [canReadEntitlements, entitlementState, entitlementKey, index]);
 
-  const debounced = {
-    query: useDebounced(query.trim(), 400),
-    yearFrom: useDebounced(yearFrom, 400),
-    yearTo: useDebounced(yearTo, 400),
-  };
+  const debouncedQuery = useDebounced(query.trim(), 400);
+  const debouncedYearFrom = useDebounced(yearFrom, 400);
+  const debouncedYearTo = useDebounced(yearTo, 400);
   const effectiveSort: SortKey =
-    sortKey ?? (debounced.query ? "relevance" : "partNumber:asc");
+    sortKey ?? (debouncedQuery ? "relevance" : "partNumber:asc");
   const sortOptions = (Object.keys(SORT_LABELS) as SortKey[]).filter(
-    (key) => key !== "relevance" || debounced.query !== "",
+    (key) => key !== "relevance" || debouncedQuery !== "",
   );
 
   // Load the levels for the active organization.
@@ -210,8 +291,9 @@ export function CatalogView() {
     return () => controller.abort();
   }, [treeKey]);
 
-  const request = useMemo((): SearchRequest => {
-    const filters: NonNullable<SearchRequest["filters"]> = {};
+  // Filters shared by the results and every filter group.
+  const baseFilters = useMemo((): SearchFilters => {
+    const filters: SearchFilters = {};
     if (selectedNode) {
       if (selectedNode.isSecurityDomain) {
         filters.securityDomainIds = [selectedNode.id];
@@ -219,32 +301,39 @@ export function CatalogView() {
         filters.primaryCategoryIds = collectIds(selectedNode).slice(0, 100);
       }
     }
-    if (status !== ALL) filters.lifecycleStatuses = [status];
-    if (region !== ALL) filters.regions = [region];
-    const from = parseYear(debounced.yearFrom);
-    const to = parseYear(debounced.yearTo);
+    const from = parseYear(debouncedYearFrom);
+    const to = parseYear(debouncedYearTo);
     if (from || to) filters.modelYears = { from, to };
+    return filters;
+  }, [selectedNode, debouncedYearFrom, debouncedYearTo]);
 
+  const filtersWith = (skip: FacetName | null): SearchFilters => {
+    const filters: SearchFilters = { ...baseFilters };
+    for (const name of FACET_NAMES) {
+      if (name === skip || picked[name].length === 0) continue;
+      (filters as Record<string, unknown>)[FILTER_KEY[name]] = picked[name];
+    }
+    return filters;
+  };
+
+  const request = useMemo((): SearchRequest => {
+    const filters: SearchFilters = { ...baseFilters };
+    for (const name of FACET_NAMES) {
+      if (picked[name].length === 0) continue;
+      (filters as Record<string, unknown>)[FILTER_KEY[name]] = picked[name];
+    }
     const [field, direction] = effectiveSort.split(":") as [
       SortField,
       "asc" | "desc" | undefined,
     ];
     return {
-      query: debounced.query,
+      query: debouncedQuery,
       filters,
       facets: [],
       sort: { field, direction: direction ?? "desc" },
       limit: PAGE_SIZE,
     };
-  }, [
-    selectedNode,
-    status,
-    region,
-    debounced.query,
-    debounced.yearFrom,
-    debounced.yearTo,
-    effectiveSort,
-  ]);
+  }, [baseFilters, picked, debouncedQuery, effectiveSort]);
 
   const searchKey = `${orgVersion}:${reload}:${JSON.stringify(request)}`;
   const loading = result?.key !== searchKey;
@@ -252,6 +341,41 @@ export function CatalogView() {
   const items = result?.items ?? [];
   const meta = result?.meta ?? null;
   const error = loading ? "" : (result?.error ?? "");
+
+  // One counts request per filter group (each skips its own filter).
+  const facetScope = String(orgVersion);
+  // Counts start only after the table has loaded so they never slow it down.
+  const facetsEnabled = !loading;
+  const facets: Record<FacetName, FacetState> = {
+    manufacturer: useFacet(
+      "manufacturer",
+      debouncedQuery,
+      JSON.stringify(filtersWith("manufacturer")),
+      facetScope,
+      facetsEnabled,
+    ),
+    region: useFacet(
+      "region",
+      debouncedQuery,
+      JSON.stringify(filtersWith("region")),
+      facetScope,
+      facetsEnabled,
+    ),
+    material: useFacet(
+      "material",
+      debouncedQuery,
+      JSON.stringify(filtersWith("material")),
+      facetScope,
+      facetsEnabled,
+    ),
+    lifecycleStatus: useFacet(
+      "lifecycleStatus",
+      debouncedQuery,
+      JSON.stringify(filtersWith("lifecycleStatus")),
+      facetScope,
+      facetsEnabled,
+    ),
+  };
 
   // Run the search whenever the controls change; older requests are cancelled.
   useEffect(() => {
@@ -323,22 +447,32 @@ export function CatalogView() {
     }
   }
 
-  const activeChips: Array<{ key: string; label: string; clear: () => void }> =
-    [];
-  if (status !== ALL)
-    activeChips.push({
-      key: "status",
-      label: `Status: ${status}`,
-      clear: () => setStatus(ALL),
+  function setPicked(next: Picked) {
+    setPickedState({ org: orgVersion, value: next });
+  }
+
+  function toggleValue(name: FacetName, value: string) {
+    const current = picked[name];
+    setPicked({
+      ...picked,
+      [name]: current.includes(value)
+        ? current.filter((entry) => entry !== value)
+        : [...current, value],
     });
-  if (region !== ALL)
-    activeChips.push({
-      key: "region",
-      label: `Region: ${region}`,
-      clear: () => setRegion(ALL),
-    });
-  if (yearFrom || yearTo)
-    activeChips.push({
+  }
+
+  const chips: Array<{ key: string; label: string; clear: () => void }> = [];
+  for (const name of FACET_NAMES) {
+    for (const value of picked[name]) {
+      chips.push({
+        key: `${name}:${value}`,
+        label: `${FACET_LABELS[name]}: ${value}`,
+        clear: () => toggleValue(name, value),
+      });
+    }
+  }
+  if (yearFrom || yearTo) {
+    chips.push({
       key: "year",
       label: `Year: ${yearFrom || "…"}–${yearTo || "…"}`,
       clear: () => {
@@ -346,12 +480,17 @@ export function CatalogView() {
         setYearTo("");
       },
     });
+  }
+  const filterCount = chips.length;
 
-  function clearAll() {
-    setStatus(ALL);
-    setRegion(ALL);
+  function clearFilters() {
+    setPicked(EMPTY_PICKED);
     setYearFrom("");
     setYearTo("");
+  }
+
+  function clearAll() {
+    clearFilters();
     setSelectedNode(null);
     setQuery("");
     setSortKey(null);
@@ -359,29 +498,44 @@ export function CatalogView() {
 
   const selectedInfo = selectedNode ? index.get(selectedNode.id) : undefined;
   const hasConstraints =
-    activeChips.length > 0 || selectedNode !== null || query.trim() !== "";
+    filterCount > 0 || selectedNode !== null || query.trim() !== "";
   const orgName =
     profile.activeContext?.organizationName ?? "your organization";
 
-  const tree_ = (
-    <LevelsTree
-      roots={roots}
-      index={index}
-      selectedId={selectedNode?.id ?? null}
-      loading={treeLoading}
-      error={treeError}
-      allowedIds={allowedIds}
-      onSelect={(node) => {
-        setSelectedNode(node);
-        setLevelsOpen(false);
-      }}
-      onRetry={() => setTreeReload((value) => value + 1)}
-    />
+  const sidebar = (
+    <>
+      <LevelsTree
+        roots={roots}
+        index={index}
+        selectedId={selectedNode?.id ?? null}
+        loading={treeLoading}
+        error={treeError}
+        allowedIds={allowedIds}
+        onSelect={(node) => {
+          setSelectedNode(node);
+          setFiltersOpen(false);
+        }}
+        onRetry={() => setTreeReload((value) => value + 1)}
+      />
+      <FacetPanel
+        facets={facets}
+        picked={picked}
+        onToggle={toggleValue}
+        yearFrom={yearFrom}
+        yearTo={yearTo}
+        onYearFrom={setYearFrom}
+        onYearTo={setYearTo}
+        activeCount={filterCount}
+        onClear={clearFilters}
+      />
+    </>
   );
 
   return (
     <div className="flex h-full">
-      <aside className="hidden w-72 shrink-0 border-r lg:block">{tree_}</aside>
+      <aside className="hidden w-72 shrink-0 overflow-y-auto border-r lg:block">
+        {sidebar}
+      </aside>
 
       <section className="flex min-w-0 flex-1 flex-col">
         <div className="space-y-3 border-b p-4">
@@ -448,9 +602,14 @@ export function CatalogView() {
             <Button
               variant="outline"
               className="lg:hidden"
-              onClick={() => setLevelsOpen(true)}
+              onClick={() => setFiltersOpen(true)}
             >
-              <Layers /> Levels
+              <SlidersHorizontal /> Filters
+              {filterCount > 0 ? (
+                <span className="rounded-full bg-hl-blue/12 px-1.5 font-mono text-[10px] text-hl-blue">
+                  {filterCount}
+                </span>
+              ) : null}
             </Button>
             <div className="relative min-w-[12rem] flex-1">
               <Search
@@ -485,73 +644,9 @@ export function CatalogView() {
             </Select>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Select
-              value={status}
-              onValueChange={(value) => setStatus(String(value))}
-            >
-              <SelectTrigger className="w-40" aria-label="Filter by status">
-                <SelectValue>
-                  {(value) => (value === ALL ? "Any status" : String(value))}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Any status</SelectItem>
-                {LIFECYCLE_STATUSES.map((entry) => (
-                  <SelectItem key={entry} value={entry}>
-                    {entry}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={region}
-              onValueChange={(value) => setRegion(String(value))}
-            >
-              <SelectTrigger className="w-44" aria-label="Filter by region">
-                <SelectValue>
-                  {(value) => (value === ALL ? "Any region" : String(value))}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Any region</SelectItem>
-                {REGIONS.map((entry) => (
-                  <SelectItem key={entry} value={entry}>
-                    {entry}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input
-              inputMode="numeric"
-              placeholder="Year from"
-              aria-label="Model year from"
-              className="w-28"
-              value={yearFrom}
-              onChange={(event) =>
-                setYearFrom(event.target.value.replace(/\D/g, "").slice(0, 4))
-              }
-            />
-            <Input
-              inputMode="numeric"
-              placeholder="Year to"
-              aria-label="Model year to"
-              className="w-28"
-              value={yearTo}
-              onChange={(event) =>
-                setYearTo(event.target.value.replace(/\D/g, "").slice(0, 4))
-              }
-            />
-            {hasConstraints ? (
-              <Button variant="ghost" size="sm" onClick={clearAll}>
-                Clear all
-              </Button>
-            ) : null}
-          </div>
-
-          {activeChips.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {activeChips.map((chip) => (
+          {chips.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {chips.map((chip) => (
                 <button
                   key={chip.key}
                   type="button"
@@ -562,6 +657,9 @@ export function CatalogView() {
                   <X className="size-3" aria-label={`Remove ${chip.label}`} />
                 </button>
               ))}
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                Clear filters
+              </Button>
             </div>
           ) : null}
         </div>
@@ -616,7 +714,7 @@ export function CatalogView() {
               </div>
               {hasConstraints ? (
                 <Button variant="outline" onClick={clearAll}>
-                  Clear filters
+                  Clear everything
                 </Button>
               ) : null}
             </div>
@@ -748,12 +846,12 @@ export function CatalogView() {
         </div>
       </section>
 
-      <Sheet open={levelsOpen} onOpenChange={setLevelsOpen}>
-        <SheetContent side="left" className="w-72 p-0">
+      <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <SheetContent side="left" className="w-80 overflow-y-auto p-0">
           <SheetHeader className="sr-only">
-            <SheetTitle>Levels</SheetTitle>
+            <SheetTitle>Levels and filters</SheetTitle>
           </SheetHeader>
-          {tree_}
+          {sidebar}
         </SheetContent>
       </Sheet>
 
