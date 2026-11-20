@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle } from "lucide-react";
+import Link from "next/link";
+import { AlertCircle, ArrowUpRight } from "lucide-react";
 import { useSession } from "@/components/session-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -158,6 +159,17 @@ export function PartDrawer({ partId, index, onClose }: PartDrawerProps) {
             </>
           ) : null}
         </div>
+
+        {part ? (
+          <div className="border-t p-4">
+            <Button
+              className="w-full"
+              render={<Link href={`/catalog/${part.id}`} />}
+            >
+              Open full page <ArrowUpRight />
+            </Button>
+          </div>
+        ) : null}
 
         {canEdit || canArchive ? (
           <div className="flex gap-2 border-t p-4">

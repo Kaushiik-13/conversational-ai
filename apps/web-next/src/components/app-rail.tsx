@@ -5,7 +5,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Check, KeyRound, LogOut } from "lucide-react";
 import { useSession } from "@/components/session-provider";
-import { NAV, initials, type NavItem } from "@/components/nav-items";
+import {
+  NAV,
+  initials,
+  isNavActive,
+  type NavItem,
+} from "@/components/nav-items";
 import { RoleBadge } from "@/components/role-badge";
 import {
   DropdownMenu,
@@ -194,8 +199,7 @@ export function AppRail() {
   const visible = NAV.filter((item) => has(item.capability));
   const main = visible.filter((item) => item.group === "main");
   const manage = visible.filter((item) => item.group === "manage");
-  const isActive = (item: NavItem) =>
-    pathname === item.href || pathname.startsWith(`${item.href}/`);
+  const isActive = (item: NavItem) => isNavActive(item, pathname);
 
   return (
     <aside className="hidden w-16 shrink-0 flex-col items-center gap-3 border-r bg-secondary/40 py-3 lg:flex">

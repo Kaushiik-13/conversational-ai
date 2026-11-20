@@ -80,3 +80,15 @@ export function initials(name: string): string {
     .map((word) => word.charAt(0).toUpperCase())
     .join("");
 }
+
+/** Pages that belong to a nav item (e.g. part and vehicle pages sit under Catalog). */
+const EXTRA_PREFIXES: Record<string, string[]> = {
+  "/catalog": ["/vehicles"],
+};
+
+export function isNavActive(item: NavItem, pathname: string): boolean {
+  const prefixes = [item.href, ...(EXTRA_PREFIXES[item.href] ?? [])];
+  return prefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}

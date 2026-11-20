@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   AlertCircle,
   Download,
@@ -175,6 +177,7 @@ function useFacet(
 
 export function CatalogView() {
   const { profile, has, orgVersion } = useSession();
+  const searchParams = useSearchParams();
 
   // Levels (keyed by organization so a switch never shows stale levels)
   const [treeReload, setTreeReload] = useState(0);
@@ -187,14 +190,12 @@ export function CatalogView() {
   const [selection, setSelection] = useState<{
     org: number;
     node: CategoryNode | null;
-  }>({ org: 0, node: null });
+    touched: boolean;
+  }>({ org: 0, node: null, touched: false });
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const selectedNode = selection.org === orgVersion ? selection.node : null;
-  const setSelectedNode = (node: CategoryNode | null) =>
-    setSelection({ org: orgVersion, node });
 
   // Search controls
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(searchParams.get("q") ?? "");
   const [pickedState, setPickedState] = useState<{
     org: number;
     value: Picked;
@@ -226,6 +227,17 @@ export function CatalogView() {
     [treeCurrent],
   );
   const index = useMemo(() => buildCategoryIndex(roots), [roots]);
+
+  // A level can be linked to with ?level=ID until the user picks one themselves.
+  const levelParam = Number(searchParams.get("level")) || null;
+  const urlNode = levelParam ? (index.get(levelParam)?.node ?? null) : null;
+  const selectedNode = selection.touched
+    ? selection.org === orgVersion
+      ? selection.node
+      : null
+    : urlNode;
+  const setSelectedNode = (node: CategoryNode | null) =>
+    setSelection({ org: orgVersion, node, touched: true });
   // Entitlements can be granted on the hidden top level, so resolve them
   // against the full tree.
   const fullIndex = useMemo(
@@ -701,16 +713,13 @@ export function CatalogView() {
                             onClick={() => setOpenPartId(item.id)}
                           >
                             <TableCell className="pl-4 font-mono text-xs">
-                              <button
-                                type="button"
+                              <Link
+                                href={`/catalog/${item.id}`}
                                 className="text-hl-blue underline-offset-4 hover:underline"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setOpenPartId(item.id);
-                                }}
+                                onClick={(event) => event.stopPropagation()}
                               >
                                 {item.partNumber}
-                              </button>
+                              </Link>
                             </TableCell>
                             <TableCell className="max-w-xs">
                               <p className="truncate font-medium">

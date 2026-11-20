@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { ChevronsUpDown, KeyRound, LogOut, Menu } from "lucide-react";
 import { AppRail } from "@/components/app-rail";
 import { BrandLogo } from "@/components/brand-logo";
-import { NAV, initials } from "@/components/nav-items";
+import { NAV, initials, isNavActive } from "@/components/nav-items";
 import { RoleBadge } from "@/components/role-badge";
 import { useSession } from "@/components/session-provider";
 import { Button } from "@/components/ui/button";
@@ -114,8 +114,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </p>
         {items.map((item) => {
           const Icon = item.icon;
-          const active =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const active = isNavActive(item, pathname);
           if (!item.ready) {
             return (
               <div
