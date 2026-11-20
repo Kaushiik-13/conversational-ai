@@ -5,6 +5,7 @@ WORKDIR /workspace
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
+COPY apps/web-next/package.json apps/web-next/package.json
 
 RUN npm ci --workspace=@automotive-search/web --include-workspace-root
 

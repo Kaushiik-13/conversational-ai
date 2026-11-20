@@ -5,8 +5,9 @@ WORKDIR /workspace
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
+COPY apps/web-next/package.json apps/web-next/package.json
 
-RUN npm ci --workspace=@api --include-workspace-root
+RUN npm ci --workspace=@automotive-search/api --include-workspace-root
 
 FROM dependencies AS build
 
@@ -16,8 +17,8 @@ COPY database/seeds database/seeds
 COPY packages/cube-query /workspace/packages/cube-query
 COPY semantic/automotive/catalog.yaml /workspace/semantic/automotive/catalog.yaml
 
-RUN npm run build --workspace=@api \
-    && npm prune --omit=dev --workspace=@api --include-workspace-root
+RUN npm run build --workspace=@automotive-search/api \
+    && npm prune --omit=dev --workspace=@automotive-search/api --include-workspace-root
 
 FROM node:22.14.0-bookworm-slim AS runtime
 
