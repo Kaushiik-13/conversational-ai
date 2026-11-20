@@ -55,6 +55,12 @@ async function bootstrap() {
 
   const port = Number(process.env.API_PORT ?? 3000);
   await app.listen(port);
+
+  // Keep connections open longer than typical proxies do, so a reused
+  // connection is not closed underneath an in-flight request.
+  const server = app.getHttpServer() as import('node:http').Server;
+  server.keepAliveTimeout = 65_000;
+  server.headersTimeout = 66_000;
 }
 
 void bootstrap();

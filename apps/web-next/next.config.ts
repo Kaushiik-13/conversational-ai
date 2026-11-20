@@ -8,6 +8,10 @@ const apiInternalUrl = process.env.API_INTERNAL_URL ?? "http://localhost:3000";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  experimental: {
+    // Catalog searches over millions of rows can take a while on a cold database.
+    proxyTimeout: 180_000,
+  },
   outputFileTracingRoot: path.join(__dirname, "../.."),
   async rewrites() {
     return [

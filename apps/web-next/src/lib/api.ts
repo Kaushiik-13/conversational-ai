@@ -70,8 +70,12 @@ export async function apiRequestFull<T, M = Record<string, unknown>>(
 
   if (!response.ok) {
     const failure = (await response.json().catch(() => ({}))) as ApiFailure;
+    const fallback =
+      response.status >= 500
+        ? "The server took too long or could not be reached. Please try again."
+        : "The request could not be completed.";
     throw new ApiError(
-      failure.error?.message ?? "The request could not be completed.",
+      failure.error?.message ?? fallback,
       response.status,
       failure.error?.code,
     );
