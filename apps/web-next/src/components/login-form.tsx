@@ -68,9 +68,31 @@ export function LoginForm() {
           </span>
         </div>
         <div className="space-y-1.5">
-          <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
-          <p className="text-sm text-muted-foreground">
-            Use the account your organization gave you.
+          <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {["Welcome", "back"].map((word, index) => (
+              <span
+                key={word}
+                className="motion-safe-anim mr-[0.25em] inline-block last:mr-0"
+                style={{
+                  animation: `word-rise 650ms cubic-bezier(0.2, 0.8, 0.2, 1) ${
+                    index * 110
+                  }ms both`,
+                }}
+              >
+                {word}
+              </span>
+            ))}
+          </h2>
+          <span
+            aria-hidden
+            className="motion-safe-anim block h-[3px] w-12 origin-left bg-signal"
+            style={{ animation: "draw-line 700ms ease-out 450ms both" }}
+          />
+          <p
+            className="motion-safe-anim text-sm text-muted-foreground"
+            style={{ animation: "word-rise 650ms ease-out 350ms both" }}
+          >
+            Sign in with the account your organization gave you.
           </p>
         </div>
       </div>
