@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AnimatedCaption } from "@/components/animated-caption";
 import { BrandLogo } from "@/components/brand-logo";
 import { ConversationDemo } from "@/components/conversation-demo";
 import { LoginForm } from "@/components/login-form";
@@ -32,6 +33,7 @@ export default function LoginPage() {
                 Verify every answer.
               </span>
             </h1>
+            <AnimatedCaption />
             <p className="max-w-md text-lg text-muted-foreground short:hidden">
               {BRAND.description}
             </p>
