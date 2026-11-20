@@ -23,28 +23,27 @@ export default function LoginPage() {
           </span>
         </header>
 
-        <div className="grid flex-1 lg:grid-cols-[1.4fr_1fr]">
-          <section className="flex min-w-0 flex-col justify-between gap-12 border-b p-6 lg:border-r lg:border-b-0 lg:p-10">
-            <div className="space-y-6">
-              <h1 className="text-[clamp(2.75rem,7vw,5.5rem)] leading-[0.95] font-semibold tracking-[-0.045em] text-balance">
-                Ask your data.
-                <br />
-                <span className="text-muted-foreground">
-                  Verify every answer.
-                </span>
-              </h1>
-              <p className="max-w-md text-lg text-muted-foreground">
-                {BRAND.description}
-              </p>
-            </div>
-            <div className="hidden sm:block">
-              <ConversationDemo />
-            </div>
+        <div className="grid flex-1 md:grid-cols-[1.25fr_1fr] lg:grid-cols-[1.4fr_1fr]">
+          <section className="min-w-0 space-y-6 border-b p-6 md:border-r lg:border-b-0 lg:p-10">
+            <h1 className="text-[clamp(2.75rem,7vw,5.5rem)] leading-[0.95] font-semibold tracking-[-0.045em] text-balance">
+              Ask your data.
+              <br />
+              <span className="text-muted-foreground">
+                Verify every answer.
+              </span>
+            </h1>
+            <p className="max-w-md text-lg text-muted-foreground">
+              {BRAND.description}
+            </p>
           </section>
 
-          <section className="flex items-center p-6 lg:p-10">
+          <section className="flex items-center p-6 md:border-b lg:row-span-2 lg:border-b-0 lg:border-l lg:p-10">
             <LoginForm />
           </section>
+
+          <div className="hidden min-w-0 p-6 md:col-span-2 md:block lg:col-span-1 lg:col-start-1 lg:row-start-2 lg:p-10 lg:pt-0">
+            <ConversationDemo />
+          </div>
         </div>
 
         <footer className="grid border-t sm:grid-cols-3">

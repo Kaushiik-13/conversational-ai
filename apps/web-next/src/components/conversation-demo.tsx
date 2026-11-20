@@ -102,7 +102,7 @@ export function ConversationDemo() {
 
   return (
     <div
-      className="w-full max-w-xl rounded-lg border bg-card"
+      className="w-full rounded-lg border bg-card lg:max-w-xl"
       aria-label="Example conversation"
       role="img"
     >
@@ -148,14 +148,17 @@ export function ConversationDemo() {
           className="motion-safe-anim min-h-36 rounded-md border"
           style={{
             opacity: showResult ? 1 : 0,
-            animation: showResult && !reduced ? "rise-in 400ms ease-out" : undefined,
+            animation:
+              showResult && !reduced ? "rise-in 400ms ease-out" : undefined,
           }}
         >
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>{example.columns[0]}</TableHead>
-                <TableHead className="text-right">{example.columns[1]}</TableHead>
+                <TableHead className="text-right">
+                  {example.columns[1]}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
