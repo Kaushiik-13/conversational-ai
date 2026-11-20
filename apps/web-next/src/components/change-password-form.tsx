@@ -111,7 +111,7 @@ export function ChangePasswordForm() {
     setError("");
     try {
       await changePassword(current, next);
-      router.replace("/");
+      router.replace("/catalog");
     } catch (failure) {
       setError(
         failure instanceof Error

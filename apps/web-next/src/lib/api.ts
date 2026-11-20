@@ -6,9 +6,20 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly code?: string,
   ) {
     super(message);
   }
+}
+
+export interface MembershipProfile {
+  membershipId: string;
+  organizationId: string;
+  organizationCode: string;
+  organizationName: string;
+  role: string;
+  isDefault: boolean;
+  isSelected: boolean;
 }
 
 export interface AuthProfile {
@@ -17,8 +28,10 @@ export interface AuthProfile {
     organizationId: string;
     organizationCode: string;
     organizationName: string;
+    membershipId: string;
     role: string;
   } | null;
+  memberships: MembershipProfile[];
   capabilities: string[];
   mustChangePassword: boolean;
 }
@@ -30,10 +43,15 @@ function readCookie(name: string): string | undefined {
     ?.slice(name.length + 1);
 }
 
-export async function apiRequest<T>(
+export interface ApiResult<T, M = Record<string, unknown>> {
+  data: T;
+  meta: M & { requestId?: string };
+}
+
+export async function apiRequestFull<T, M = Record<string, unknown>>(
   path: string,
-  init: { method?: string; body?: unknown } = {},
-): Promise<T> {
+  init: { method?: string; body?: unknown; signal?: AbortSignal } = {},
+): Promise<ApiResult<T, M>> {
   const method = init.method ?? "GET";
   const headers: Record<string, string> = { accept: "application/json" };
   if (init.body !== undefined) headers["content-type"] = "application/json";
@@ -46,6 +64,7 @@ export async function apiRequest<T>(
     method,
     headers,
     credentials: "same-origin",
+    signal: init.signal,
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
   });
 
@@ -54,10 +73,19 @@ export async function apiRequest<T>(
     throw new ApiError(
       failure.error?.message ?? "The request could not be completed.",
       response.status,
+      failure.error?.code,
     );
   }
-  if (response.status === 204) return undefined as T;
-  return ((await response.json()) as { data: T }).data;
+  if (response.status === 204)
+    return { data: undefined as T, meta: {} as M & { requestId?: string } };
+  return (await response.json()) as ApiResult<T, M>;
+}
+
+export async function apiRequest<T>(
+  path: string,
+  init: { method?: string; body?: unknown; signal?: AbortSignal } = {},
+): Promise<T> {
+  return (await apiRequestFull<T>(path, init)).data;
 }
 
 export async function login(
@@ -80,3 +108,9 @@ export const changePassword = (currentPassword: string, newPassword: string) =>
 export const getProfile = () => apiRequest<AuthProfile>("/auth/me");
 export const logout = () =>
   apiRequest<void>("/auth/logout", { method: "POST" });
+
+export const selectOrganization = (organizationId: string) =>
+  apiRequest<AuthProfile>("/auth/organization-context", {
+    method: "PUT",
+    body: { organizationId },
+  });

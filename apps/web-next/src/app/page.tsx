@@ -1,5 +1,5 @@
-import { HomeView } from "@/components/home-view";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return <HomeView />;
+  redirect("/catalog");
 }
