@@ -114,8 +114,8 @@ export function ConversationDemo() {
         </span>
       </div>
 
-      <div className="space-y-5 p-5">
-        <p className="min-h-14 text-xl leading-snug font-medium tracking-tight">
+      <div className="space-y-4 p-5 short:space-y-3 short:p-4">
+        <p className="min-h-12 text-xl leading-snug font-medium tracking-tight">
           {question}
           {!reduced && phase === "typing" ? (
             <span

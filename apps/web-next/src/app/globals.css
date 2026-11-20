@@ -4,6 +4,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Height-based variants so full-screen pages fit without scrolling. */
+@custom-variant short (@media (max-height: 920px));
+@custom-variant tiny (@media (max-height: 600px));
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

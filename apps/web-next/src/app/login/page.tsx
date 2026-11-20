@@ -14,25 +14,25 @@ const PRINCIPLES = [
 
 export default function LoginPage() {
   return (
-    <main className="min-h-screen">
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col border-x">
-        <header className="flex h-14 items-center justify-between border-b px-6 lg:px-10">
+    <main className="h-dvh overflow-x-hidden overflow-y-auto">
+      <div className="mx-auto flex min-h-full max-w-6xl flex-col border-x">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b px-6 lg:px-10">
           <BrandLogo />
           <span className="font-mono text-xs text-muted-foreground">
             Preview
           </span>
         </header>
 
-        <div className="grid flex-1 md:grid-cols-[1.25fr_1fr] lg:grid-cols-[1.4fr_1fr]">
-          <section className="min-w-0 space-y-6 border-b p-6 md:border-r lg:border-b-0 lg:p-10">
-            <h1 className="text-[clamp(2.75rem,7vw,5.5rem)] leading-[0.95] font-semibold tracking-[-0.045em] text-balance">
+        <div className="grid flex-1 md:grid-cols-[1.25fr_1fr] lg:grid-cols-[1.4fr_1fr] lg:grid-rows-[1fr_auto]">
+          <section className="min-w-0 space-y-6 border-b p-6 md:border-r lg:border-b-0 lg:p-10 short:lg:p-6">
+            <h1 className="text-[clamp(2.5rem,min(7vw,9vh),5.5rem)] leading-[0.95] font-semibold tracking-[-0.045em] text-balance">
               Ask your data.
               <br />
               <span className="text-muted-foreground">
                 Verify every answer.
               </span>
             </h1>
-            <p className="max-w-md text-lg text-muted-foreground">
+            <p className="max-w-md text-lg text-muted-foreground short:hidden">
               {BRAND.description}
             </p>
           </section>
@@ -41,16 +41,16 @@ export default function LoginPage() {
             <LoginForm />
           </section>
 
-          <div className="hidden min-w-0 p-6 md:col-span-2 md:block lg:col-span-1 lg:col-start-1 lg:row-start-2 lg:p-10 lg:pt-0">
+          <div className="hidden min-w-0 p-6 tiny:hidden md:col-span-2 md:block lg:col-span-1 lg:col-start-1 lg:row-start-2 lg:self-end lg:p-10 lg:pt-0 short:lg:p-6 short:lg:pt-0">
             <ConversationDemo />
           </div>
         </div>
 
-        <footer className="grid border-t sm:grid-cols-3">
+        <footer className="hidden shrink-0 border-t sm:grid sm:grid-cols-3 short:hidden">
           {PRINCIPLES.map(([title, text]) => (
             <div
               key={title}
-              className="space-y-1 border-b p-6 last:border-b-0 sm:border-r sm:border-b-0 sm:last:border-r-0 lg:px-10"
+              className="space-y-0.5 p-4 sm:border-r sm:last:border-r-0 lg:px-10"
             >
               <p className="font-mono text-xs uppercase">{title}</p>
               <p className="text-sm text-muted-foreground">{text}</p>
