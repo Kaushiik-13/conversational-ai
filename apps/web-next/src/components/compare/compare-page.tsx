@@ -148,6 +148,19 @@ const ROWS: RowDef[] = [
   },
 ];
 
+/** The fields that matter when choosing between parts. The rest sit behind "All fields". */
+const KEY_ROWS = new Set([
+  "status",
+  "level",
+  "maker",
+  "material",
+  "weight",
+  "cost",
+  "vehicle",
+  "year",
+  "market",
+]);
+
 function parseIds(raw: string | null): number[] {
   const ids: number[] = [];
   for (const piece of (raw ?? "").split(",")) {
@@ -164,6 +177,7 @@ export function ComparePage() {
   const { index } = useCategoryIndex();
   const compare = useCompare();
   const [onlyDifferences, setOnlyDifferences] = useState(false);
+  const [allFields, setAllFields] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const ids = useMemo(() => parseIds(searchParams.get("ids")), [searchParams]);
@@ -230,9 +244,11 @@ export function ComparePage() {
       const shown = values.some((value) => value !== undefined);
       const differs = new Set(values.map((value) => value ?? "—")).size > 1;
       return { row, shown, differs };
-    }).filter((entry) => entry.shown);
+    }).filter(
+      (entry) => entry.shown && (allFields || KEY_ROWS.has(entry.row.key)),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [available.length, current, index]);
+  }, [available.length, current, index, allFields]);
 
   const visibleRows = onlyDifferences
     ? rows.filter((entry) => entry.differs)
@@ -321,6 +337,27 @@ export function ComparePage() {
                   />
                 </span>
                 Only differences
+              </button>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={allFields}
+                onClick={() => setAllFields((value) => !value)}
+                className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm"
+              >
+                <span
+                  aria-hidden
+                  className={`flex h-4 w-7 items-center rounded-full p-0.5 transition-colors ${
+                    allFields ? "bg-hl-blue" : "bg-input"
+                  }`}
+                >
+                  <span
+                    className={`size-3 rounded-full bg-background transition-transform ${
+                      allFields ? "translate-x-3" : ""
+                    }`}
+                  />
+                </span>
+                All fields
               </button>
               {ids.length < MAX_COMPARE ? (
                 <Button

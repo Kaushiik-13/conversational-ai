@@ -14,6 +14,7 @@ import { useCategoryIndex } from "@/components/catalog/use-category-index";
 import { useCompare } from "@/components/compare/use-compare";
 import { StatusBadge } from "@/components/catalog/status-badge";
 import { RelatedParts } from "@/components/part/related-parts";
+import { SimilarParts } from "@/components/part/similar-parts";
 import { useSession } from "@/components/session-provider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -327,6 +328,7 @@ export function PartPage({ id }: { id: number }) {
               </aside>
             </div>
 
+            <SimilarParts part={part} />
             <RelatedParts part={part} index={index} />
           </>
         )}
