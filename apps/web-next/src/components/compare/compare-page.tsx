@@ -16,13 +16,14 @@ import {
 } from "lucide-react";
 import { useCategoryIndex } from "@/components/catalog/use-category-index";
 import { StatusBadge } from "@/components/catalog/status-badge";
+import { PartPicker } from "@/components/compare/part-picker";
 import { useCompare } from "@/components/compare/use-compare";
 import { useSession } from "@/components/session-provider";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, apiRequest } from "@/lib/api";
 import type { CatalogRecord } from "@/lib/catalog-types";
-import { MAX_COMPARE } from "@/lib/compare-store";
+import { MAX_COMPARE, type CompareEntry } from "@/lib/compare-store";
 import { HUE_DOT, domainHue } from "@/lib/highlights";
 
 type Result =
@@ -178,6 +179,7 @@ export function ComparePage() {
   const compare = useCompare();
   const [onlyDifferences, setOnlyDifferences] = useState(false);
   const [allFields, setAllFields] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const ids = useMemo(() => parseIds(searchParams.get("ids")), [searchParams]);
@@ -261,6 +263,12 @@ export function ComparePage() {
       .filter((id): id is number => id !== undefined),
   );
   const mixedLevels = domainIds.size > 1;
+
+  function addPart(entry: CompareEntry) {
+    if (ids.includes(entry.id) || ids.length >= MAX_COMPARE) return;
+    if (!compare.has(entry.id)) compare.toggle(entry);
+    router.replace(`/compare?ids=${[...ids, entry.id].join(",")}`);
+  }
 
   function removeColumn(id: number) {
     compare.remove(id);
@@ -361,9 +369,9 @@ export function ComparePage() {
               </button>
               {ids.length < MAX_COMPARE ? (
                 <Button
-                  variant="outline"
-                  nativeButton={false}
-                  render={<Link href="/catalog" />}
+                  variant={adding ? "secondary" : "outline"}
+                  aria-expanded={adding}
+                  onClick={() => setAdding((value) => !value)}
                 >
                   <Plus /> Add parts
                 </Button>
@@ -406,12 +414,22 @@ export function ComparePage() {
                 Pick 2 to {MAX_COMPARE} parts to compare
               </p>
               <p className="text-sm text-muted-foreground">
-                Tick the box next to parts in the catalog, or use Add to compare
-                on a part page.
+                Search for parts right here, or tick them in the catalog.
               </p>
             </div>
+            <PartPicker
+              selectedIds={ids}
+              full={ids.length >= MAX_COMPARE}
+              max={MAX_COMPARE}
+              onAdd={addPart}
+              autoFocus
+            />
             <div className="flex flex-wrap justify-center gap-2">
-              <Button nativeButton={false} render={<Link href="/catalog" />}>
+              <Button
+                variant="outline"
+                nativeButton={false}
+                render={<Link href="/catalog" />}
+              >
                 Browse the catalog
               </Button>
               {compare.count > 0 ? (
@@ -436,6 +454,17 @@ export function ComparePage() {
           </div>
         ) : (
           <>
+            {adding && ids.length < MAX_COMPARE ? (
+              <div className="rounded-xl border p-4">
+                <PartPicker
+                  selectedIds={ids}
+                  full={ids.length >= MAX_COMPARE}
+                  max={MAX_COMPARE}
+                  onAdd={addPart}
+                  autoFocus
+                />
+              </div>
+            ) : null}
             {available.length < 2 ? (
               <div
                 role="note"
