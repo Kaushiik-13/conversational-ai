@@ -1,6 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   ArrayUnique,
   IsArray,
   IsIn,
@@ -185,4 +186,24 @@ export class SearchRequestDto {
   @IsString()
   @MaxLength(2048)
   cursor?: string;
+}
+
+/** Counts only: no items and no hit count, so it is much cheaper than a search. */
+export class SearchFacetsRequestDto {
+  @Transform(cleanString)
+  @IsString()
+  @Length(0, 300)
+  query!: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SearchFiltersDto)
+  filters?: SearchFiltersDto;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(6)
+  @ArrayUnique()
+  @IsIn(SEARCH_FACETS, { each: true })
+  facets!: SearchFacetName[];
 }

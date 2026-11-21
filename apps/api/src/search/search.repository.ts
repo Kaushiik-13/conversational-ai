@@ -102,6 +102,29 @@ export class SearchRepository {
     };
   }
 
+  /** Counts for one group, ignoring that group's own filter. */
+  async facet(
+    client: PoolClient,
+    search: BuiltSearch,
+    facet: SearchFacetName,
+  ): Promise<SearchFacetBucket[]> {
+    const facetFilters = this.withoutOwnFacetFilter(search.filters, facet);
+    const result = await client.query<{
+      value: string;
+      count: string;
+    }>(
+      `
+        SELECT value, count::text
+        FROM catalog.search_visible_facet($1, $2::jsonb, $3)
+      `,
+      [search.query, JSON.stringify(facetFilters), facet],
+    );
+    return result.rows.map((row): SearchFacetBucket => ({
+      value: row.value,
+      count: Number(row.count),
+    }));
+  }
+
   async facets(
     client: PoolClient,
     search: BuiltSearch,
@@ -109,23 +132,20 @@ export class SearchRepository {
   ): Promise<SearchFacets> {
     const facets: SearchFacets = {};
     for (const facet of requested) {
-      const facetFilters = this.withoutOwnFacetFilter(search.filters, facet);
-      const result = await client.query<{
-        value: string;
-        count: string;
-      }>(
-        `
-          SELECT value, count::text
-          FROM catalog.search_visible_facet($1, $2::jsonb, $3)
-        `,
-        [search.query, JSON.stringify(facetFilters), facet],
-      );
-      facets[facet] = result.rows.map((row): SearchFacetBucket => ({
-        value: row.value,
-        count: Number(row.count),
-      }));
+      facets[facet] = await this.facet(client, search, facet);
     }
     return facets;
+  }
+
+  /**
+   * Identifies exactly which rows the current user can see. Users with the same
+   * signature may safely share cached counts.
+   */
+  async visibilitySignature(client: PoolClient): Promise<string> {
+    const result = await client.query<{ signature: string }>(
+      'SELECT catalog.search_visibility_signature() AS signature',
+    );
+    return result.rows[0].signature;
   }
 
   private withoutOwnFacetFilter(

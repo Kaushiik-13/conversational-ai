@@ -11,13 +11,28 @@ import type { Request } from 'express';
 import { AccessSessionGuard } from '../auth/access-session.guard';
 import { PermissionGuard } from '../authorization/permission.guard';
 import { RequirePermissions } from '../authorization/require-permissions.decorator';
-import { SearchRequestDto } from './search.dto';
+import { SearchFacetsRequestDto, SearchRequestDto } from './search.dto';
 import { SearchService } from './search.service';
 
 @Controller('search')
 @UseGuards(AccessSessionGuard, PermissionGuard)
 export class SearchController {
   constructor(private readonly searchService: SearchService) {}
+
+  @Post('facets')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('catalog.search')
+  async facets(@Body() body: SearchFacetsRequestDto, @Req() request: Request) {
+    const result = await this.searchService.searchFacets(request.auth!, body);
+    return {
+      data: { facets: result.facets },
+      meta: {
+        requestId: request.requestId,
+        queryTimeMs: result.queryTimeMs,
+        cache: result.cached ? 'hit' : 'miss',
+      },
+    };
+  }
 
   @Post()
   @HttpCode(HttpStatus.OK)

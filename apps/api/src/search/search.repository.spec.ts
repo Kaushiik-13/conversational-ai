@@ -52,4 +52,40 @@ describe('SearchRepository', () => {
       regions: ['Europe'],
     });
   });
+
+  it('counts a single group and converts counts to numbers', async () => {
+    const repository = new SearchRepository();
+    const query = jest.fn(() =>
+      Promise.resolve({
+        rows: [
+          { value: 'Europe', count: '714515' },
+          { value: 'Asia', count: '713993' },
+        ],
+      }),
+    );
+    const client = { query } as unknown as PoolClient;
+
+    const buckets = await repository.facet(
+      client,
+      repository.buildSearch('', { regions: ['Europe'] }),
+      'region',
+    );
+
+    expect(buckets).toEqual([
+      { value: 'Europe', count: 714515 },
+      { value: 'Asia', count: 713993 },
+    ]);
+  });
+
+  it('reads the visibility signature from the database', async () => {
+    const repository = new SearchRepository();
+    const query = jest.fn(() =>
+      Promise.resolve({ rows: [{ signature: 'abc123' }] }),
+    );
+    const client = { query } as unknown as PoolClient;
+
+    await expect(repository.visibilitySignature(client)).resolves.toBe(
+      'abc123',
+    );
+  });
 });

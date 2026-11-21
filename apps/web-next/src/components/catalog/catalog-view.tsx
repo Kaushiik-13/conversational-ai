@@ -114,66 +114,62 @@ function parseYear(value: string): number | undefined {
 }
 
 /**
- * Counts for one filter group. Each group loads on its own so the results
- * table never waits for counts. The API ignores a group's own filter when
- * counting it, so ticking several values in one group keeps showing the others.
+ * Counts for every filter group, from one request. The server ignores a group's
+ * own filter when counting that group, so several values in one group can be
+ * ticked together. Results are cached on the server, so repeat views are fast.
  */
-function useFacet(
-  name: FacetName,
+function useFacets(
   query: string,
   filtersJson: string,
   scope: string,
   enabled: boolean,
-): FacetState {
+): Record<FacetName, FacetState> {
   const [reload, setReload] = useState(0);
   const key = `${scope}:${reload}:${query}:${filtersJson}`;
   const [state, setState] = useState<{
     key: string;
-    buckets: FacetBucket[];
+    data: Partial<Record<FacetName, FacetBucket[]>>;
     error: boolean;
   } | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
     const controller = new AbortController();
-    apiRequestFull<{ facets: Partial<Record<FacetName, FacetBucket[]>> }>(
-      "/search",
+    apiRequest<{ facets: Partial<Record<FacetName, FacetBucket[]>> }>(
+      "/search/facets",
       {
         method: "POST",
         signal: controller.signal,
         body: {
           query,
           filters: JSON.parse(filtersJson) as SearchFilters,
-          facets: [name],
-          sort: { field: "partNumber", direction: "asc" },
-          limit: 1,
+          facets: FACET_NAMES,
         },
       },
     )
       .then((response) =>
-        setState({
-          key,
-          buckets: response.data.facets?.[name] ?? [],
-          error: false,
-        }),
+        setState({ key, data: response.facets ?? {}, error: false }),
       )
       .catch(() => {
         if (controller.signal.aborted) return;
         setState((current) => ({
           key,
-          buckets: current?.buckets ?? [],
+          data: current?.data ?? {},
           error: true,
         }));
       });
     return () => controller.abort();
-  }, [key, name, query, filtersJson, enabled]);
+  }, [key, query, filtersJson, enabled]);
 
-  return {
-    buckets: state?.buckets ?? null,
-    loading: state?.key !== key,
-    error: state?.key === key && state.error,
-    retry: () => setReload((value) => value + 1),
-  };
+  const loading = state?.key !== key;
+  const error = state?.key === key && state.error;
+  const retry = () => setReload((value) => value + 1);
+  return Object.fromEntries(
+    FACET_NAMES.map((name) => [
+      name,
+      { buckets: state?.data[name] ?? null, loading, error, retry },
+    ]),
+  ) as Record<FacetName, FacetState>;
 }
 
 export function CatalogView() {
@@ -325,15 +321,6 @@ export function CatalogView() {
     return filters;
   }, [selectedNode, debouncedYearFrom, debouncedYearTo]);
 
-  const filtersWith = (skip: FacetName | null): SearchFilters => {
-    const filters: SearchFilters = { ...baseFilters };
-    for (const name of FACET_NAMES) {
-      if (name === skip || picked[name].length === 0) continue;
-      (filters as Record<string, unknown>)[FILTER_KEY[name]] = picked[name];
-    }
-    return filters;
-  };
-
   const request = useMemo((): SearchRequest => {
     const filters: SearchFilters = { ...baseFilters };
     for (const name of FACET_NAMES) {
@@ -360,40 +347,16 @@ export function CatalogView() {
   const meta = result?.meta ?? null;
   const error = loading ? "" : (result?.error ?? "");
 
-  // One counts request per filter group (each skips its own filter).
+  // One request returns the counts for every group (each skips its own filter).
   const facetScope = String(orgVersion);
   // Counts start only after the table has loaded so they never slow it down.
   const facetsEnabled = !loading;
-  const facets: Record<FacetName, FacetState> = {
-    manufacturer: useFacet(
-      "manufacturer",
-      debouncedQuery,
-      JSON.stringify(filtersWith("manufacturer")),
-      facetScope,
-      facetsEnabled,
-    ),
-    region: useFacet(
-      "region",
-      debouncedQuery,
-      JSON.stringify(filtersWith("region")),
-      facetScope,
-      facetsEnabled,
-    ),
-    material: useFacet(
-      "material",
-      debouncedQuery,
-      JSON.stringify(filtersWith("material")),
-      facetScope,
-      facetsEnabled,
-    ),
-    lifecycleStatus: useFacet(
-      "lifecycleStatus",
-      debouncedQuery,
-      JSON.stringify(filtersWith("lifecycleStatus")),
-      facetScope,
-      facetsEnabled,
-    ),
-  };
+  const facets: Record<FacetName, FacetState> = useFacets(
+    debouncedQuery,
+    JSON.stringify(request.filters ?? {}),
+    facetScope,
+    facetsEnabled,
+  );
 
   // Run the search whenever the controls change; older requests are cancelled.
   useEffect(() => {
