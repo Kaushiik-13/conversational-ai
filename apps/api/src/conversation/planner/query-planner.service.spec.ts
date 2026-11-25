@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs';
+import { LlmService } from '../../llm/llm.service';
+import { OllamaProvider } from '../../llm/ollama.provider';
 import { resolve } from 'node:path';
 import {
   QueryPlannerService as RealQueryPlannerService,
@@ -20,6 +22,10 @@ const AUTOMOTIVE_MODEL = JSON.parse(
 
 /** Plans against the automotive model so each case reads like a question. */
 class QueryPlannerService extends RealQueryPlannerService {
+  constructor() {
+    super(new LlmService([new OllamaProvider()]));
+  }
+
   override plan(
     question: string,
     history: ConversationHistoryItem[] = [],

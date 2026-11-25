@@ -1,10 +1,6 @@
-import {
-  BadGatewayException,
-  GatewayTimeoutException,
-  Injectable,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { BadGatewayException, Injectable } from '@nestjs/common';
 import { readFile } from 'node:fs/promises';
+import { LlmService } from '../../llm/llm.service';
 import { resolve } from 'node:path';
 
 export interface ConversationPlan {
@@ -53,6 +49,8 @@ export interface SemanticModel {
 
 @Injectable()
 export class QueryPlannerService {
+  constructor(private readonly llm: LlmService) {}
+
   private schemaPromise?: Promise<Record<string, unknown>>;
 
   async plan(
@@ -733,76 +731,8 @@ export class QueryPlannerService {
     messages: ChatMessage[],
     schema: Record<string, unknown>,
   ): Promise<ConversationPlan> {
-    const provider = (process.env.CONVERSATION_LLM_PROVIDER ?? 'ollama')
-      .trim()
-      .toLowerCase();
-    if (provider !== 'ollama') {
-      throw new ServiceUnavailableException({
-        code: 'LLM_PROVIDER_NOT_SUPPORTED',
-        message:
-          'The configured conversational model provider is not supported.',
-      });
-    }
-    return this.requestOllamaPlan(
-      messages,
-      schema,
-      process.env.OLLAMA_MODEL ?? 'qwen3.5:2b',
-    );
-  }
-
-  private async requestOllamaPlan(
-    messages: ChatMessage[],
-    schema: Record<string, unknown>,
-    model: string,
-  ): Promise<ConversationPlan> {
-    const baseUrl = (
-      process.env.OLLAMA_BASE_URL ?? 'http://ollama:11434'
-    ).replace(/\/$/, '');
-    let response: Response;
-    try {
-      response = await fetch(`${baseUrl}/api/chat`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        signal: AbortSignal.timeout(120_000),
-        body: JSON.stringify({
-          model,
-          stream: false,
-          think: false,
-          format: schema,
-          options: { temperature: 0, num_ctx: 4096, num_predict: 256 },
-          messages,
-        }),
-      });
-    } catch (error) {
-      if (
-        error instanceof DOMException &&
-        (error.name === 'TimeoutError' || error.name === 'AbortError')
-      ) {
-        throw new GatewayTimeoutException({
-          code: 'LOCAL_MODEL_TIMEOUT',
-          message:
-            'The local model took too long to plan this question. Try again with a shorter or simpler question.',
-        });
-      }
-      throw new ServiceUnavailableException({
-        code: 'LOCAL_MODEL_UNAVAILABLE',
-        message:
-          'The local conversational model is unavailable. Check that the Ollama service is running.',
-      });
-    }
-
-    if (!response.ok) {
-      throw new ServiceUnavailableException({
-        code: 'LOCAL_MODEL_REQUEST_FAILED',
-        message:
-          'The local conversational model could not complete the request.',
-      });
-    }
-
-    const payload = (await response.json()) as {
-      message?: { content?: unknown };
-    };
-    return this.parseAndValidateModelPlan(payload.message?.content);
+    const result = await this.llm.generateJson({ messages, schema });
+    return this.parseAndValidateModelPlan(result.content);
   }
 
   private parseAndValidateModelPlan(rawContent: unknown): ConversationPlan {
