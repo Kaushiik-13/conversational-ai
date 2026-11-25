@@ -62,6 +62,7 @@ const LIMIT_KEYS = new Set([
   "max_record_fields",
   "max_record_rows",
 ]);
+// The query engine reads every one of these.
 
 const isRecord = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -316,6 +317,11 @@ export function validateModelDocument(
   if (!isRecord(limits)) {
     errors.push({ path: "$.limits", message: "limits is required." });
   } else {
+    for (const key of LIMIT_KEYS) {
+      if (limits[key] === undefined) {
+        errors.push({ path: `$.limits.${key}`, message: "Limit is required." });
+      }
+    }
     for (const [key, value] of Object.entries(limits)) {
       if (!LIMIT_KEYS.has(key) || !Number.isInteger(value) || value < 1) {
         errors.push({

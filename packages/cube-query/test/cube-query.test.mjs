@@ -1,12 +1,19 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { validateCubeQuery } from "../src/index.mjs";
+import { validateCubeQuery as validateAgainst } from "../src/index.mjs";
 import {
   CubeQueryAuthorizationError,
   CubeQueryValidationError,
-  compileCubeQuery,
-  executeAuthorizedCubeQuery,
+  compileCubeQuery as compileAgainst,
+  executeAuthorizedCubeQuery as executeAgainst,
 } from "../src/qgen.mjs";
+import { automotiveModel } from "./helpers.mjs";
+
+const model = automotiveModel();
+const validateCubeQuery = (input) => validateAgainst(input, model);
+const compileCubeQuery = (input) => compileAgainst(input, model);
+const executeAuthorizedCubeQuery = (input, runner) =>
+  executeAgainst(input, runner, model);
 
 const baseQuery = {
   version: 1,

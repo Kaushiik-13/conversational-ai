@@ -6,8 +6,10 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { parse } from 'yaml';
 import type { PoolClient } from 'pg';
 import type { AuthenticatedSession } from '../auth/auth.types';
 import { ApplicationAuditService } from '../common/application-audit.service';
@@ -34,17 +36,27 @@ export interface CubeQueryResult {
 }
 
 interface CubeQueryModule {
-  compileCubeQuery(input: unknown): { query: CubeQueryResult['query'] };
+  compileCubeQuery(
+    input: unknown,
+    model: unknown,
+  ): { query: CubeQueryResult['query'] };
   executeAuthorizedCubeQuery(
     input: unknown,
     runInAuthorizationContext: (
       operation: (client: PoolClient) => Promise<unknown>,
     ) => Promise<unknown>,
+    model: unknown,
   ): Promise<CubeQueryResult>;
+}
+
+interface ModelModule {
+  convertLegacyModel(definition: unknown): unknown;
 }
 
 @Injectable()
 export class ConversationService {
+  private modelPromise?: Promise<unknown>;
+
   constructor(
     private readonly database: DatabaseService,
     private readonly audit: ApplicationAuditService,
@@ -72,9 +84,10 @@ export class ConversationService {
 
     try {
       const cubeQuery = await this.loadCubeQueryModule();
+      const model = await this.loadModel();
       let validated: CubeQueryResult['query'];
       try {
-        validated = cubeQuery.compileCubeQuery(plan.cube_query).query;
+        validated = cubeQuery.compileCubeQuery(plan.cube_query, model).query;
       } catch (error) {
         const queryError = (
           error && typeof error === 'object' ? error : {}
@@ -94,7 +107,7 @@ export class ConversationService {
           return { status: plan.status, message: plan.message };
         }
         try {
-          validated = cubeQuery.compileCubeQuery(plan.cube_query).query;
+          validated = cubeQuery.compileCubeQuery(plan.cube_query, model).query;
         } catch (repairError) {
           const invalidRepair =
             repairError && typeof repairError === 'object'
@@ -142,6 +155,7 @@ export class ConversationService {
         input,
         (operation) =>
           this.database.withAuthorizationContext(session, operation),
+        await this.loadModel(),
       );
 
       await this.audit.record(
@@ -194,7 +208,7 @@ export class ConversationService {
     }
   }
 
-  private async loadCubeQueryModule(): Promise<CubeQueryModule> {
+  private cubeQueryEntry(): string {
     const candidates = [
       process.env.CUBE_QUERY_PACKAGE_ENTRY,
       resolve(process.cwd(), '../../packages/cube-query/src/qgen.mjs'),
@@ -205,6 +219,32 @@ export class ConversationService {
       Object.assign(error, { code: 'QUERY_ENGINE_UNAVAILABLE' });
       throw error;
     }
-    return (await import(pathToFileURL(entry).href)) as CubeQueryModule;
+    return entry;
+  }
+
+  private async loadCubeQueryModule(): Promise<CubeQueryModule> {
+    return (await import(
+      pathToFileURL(this.cubeQueryEntry()).href
+    )) as CubeQueryModule;
+  }
+
+  /**
+   * The semantic model document the query engine compiles against.
+   * Temporary bridge: converts the reviewed YAML. Phase 1.3 replaces this with
+   * the published model version loaded from the database.
+   */
+  private loadModel(): Promise<unknown> {
+    this.modelPromise ??= (async () => {
+      const modelModule = (await import(
+        pathToFileURL(resolve(dirname(this.cubeQueryEntry()), 'model.mjs')).href
+      )) as ModelModule;
+      const source = await readFile(
+        process.env.SEMANTIC_MODEL_PATH ??
+          resolve(process.cwd(), '../../semantic/automotive/catalog.yaml'),
+        'utf8',
+      );
+      return modelModule.convertLegacyModel(parse(source));
+    })();
+    return this.modelPromise;
   }
 }

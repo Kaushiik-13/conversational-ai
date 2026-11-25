@@ -1,96 +1,6 @@
-const MODEL = "automotive_catalog";
-const MEASURES = new Set([
-  "part_count",
-  "manufacturer_count",
-  "total_cost_usd",
-  "average_cost_usd",
-  "min_cost_usd",
-  "max_cost_usd",
-  "total_weight_kg",
-  "average_weight_kg",
-  "min_weight_kg",
-  "max_weight_kg",
-]);
-const DIMENSIONS = new Set([
-  "manufacturer",
-  "commodity",
-  "sub_commodity",
-  "vehicle_program",
-  "region",
-  "country",
-  "plant",
-  "model_year",
-  "lifecycle_status",
-  "active",
-  "category",
-  "material",
-  "supplier_status",
-  "cost_usd",
-  "weight_kg",
-  "document_version",
-]);
-const STRING_FIELDS = new Set([
-  "manufacturer",
-  "commodity",
-  "sub_commodity",
-  "vehicle_program",
-  "region",
-  "country",
-  "plant",
-  "lifecycle_status",
-  "material",
-  "supplier_status",
-  "description",
-  "category",
-  "part_number",
-  "part_name",
-]);
-const NUMBER_FIELDS = new Set([
-  "model_year",
-  "cost_usd",
-  "weight_kg",
-  "document_version",
-]);
-const DATE_FIELDS = new Set(["created_at", "updated_at"]);
-const FILTER_FIELDS = new Set([
-  ...STRING_FIELDS,
-  ...NUMBER_FIELDS,
-  ...DATE_FIELDS,
-  "active",
-]);
-const DETAIL_FIELDS = new Set([
-  "part_number",
-  "part_name",
-  "description",
-  "commodity",
-  "sub_commodity",
-  "manufacturer",
-  "vehicle_program",
-  "region",
-  "country",
-  "plant",
-  "model_year",
-  "material",
-  "lifecycle_status",
-  "supplier_status",
-  "cost_usd",
-  "weight_kg",
-  "active",
-  "document_version",
-  "created_at",
-  "updated_at",
-  "category",
-]);
-const SORT_FIELDS = new Set([...DIMENSIONS, ...MEASURES, ...DETAIL_FIELDS]);
-const STRING_OPERATORS = new Set(["equals", "in", "contains"]);
-const CATEGORY_OPERATORS = new Set(["equals", "in"]);
-const NUMBER_OPERATORS = new Set(["equals", "in", "gt", "gte", "lt", "lte"]);
-const BOOLEAN_OPERATORS = new Set(["equals", "in"]);
-const MAX_DIMENSIONS = 5;
-const MAX_FILTERS = 15;
+import { engineFor } from "./engine.mjs";
+
 const MAX_SORTS = 3;
-const MAX_LIMIT = 500;
-const DEFAULT_LIMIT = 50;
 const MAX_IN_VALUES = 50;
 const MAX_STRING_LENGTH = 256;
 
@@ -106,17 +16,9 @@ function addError(errors, path, code, message) {
   errors.push({ path, code, message });
 }
 
-function validateFilterValue(field, operator, value, path, errors) {
-  const operators =
-    field === "category"
-      ? CATEGORY_OPERATORS
-      : STRING_FIELDS.has(field)
-        ? STRING_OPERATORS
-        : NUMBER_FIELDS.has(field)
-          ? NUMBER_OPERATORS
-          : DATE_FIELDS.has(field)
-            ? new Set(["equals", "in", "gt", "gte", "lt", "lte"])
-            : BOOLEAN_OPERATORS;
+function validateFilterValue(engine, field, operator, value, path, errors) {
+  const rules = engine.filterFields.get(field);
+  const operators = rules.operators;
 
   if (!operators.has(operator)) {
     addError(
@@ -128,12 +30,7 @@ function validateFilterValue(field, operator, value, path, errors) {
     return;
   }
 
-  const expectedType =
-    STRING_FIELDS.has(field) || DATE_FIELDS.has(field)
-      ? "string"
-      : NUMBER_FIELDS.has(field)
-        ? "number"
-        : "boolean";
+  const expectedType = rules.expectedType;
   const values = operator === "in" ? value : [value];
 
   if (operator === "in" && !Array.isArray(value)) {
@@ -171,12 +68,9 @@ function validateFilterValue(field, operator, value, path, errors) {
       if (
         typeof item !== "number" ||
         !Number.isFinite(item) ||
-        (["model_year", "document_version"].includes(field) &&
-          !Number.isInteger(item))
+        (rules.integer && !Number.isInteger(item))
       ) {
-        const expected = ["model_year", "document_version"].includes(field)
-          ? "an integer"
-          : "a finite number";
+        const expected = rules.integer ? "an integer" : "a finite number";
         addError(
           errors,
           itemPath,
@@ -191,7 +85,7 @@ function validateFilterValue(field, operator, value, path, errors) {
         "INVALID_VALUE_TYPE",
         `Field '${field}' requires a ${expectedType} value.`,
       );
-    } else if (DATE_FIELDS.has(field)) {
+    } else if (rules.date) {
       if (
         Number.isNaN(Date.parse(item)) ||
         !/^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(item)
@@ -205,7 +99,7 @@ function validateFilterValue(field, operator, value, path, errors) {
       }
     } else if (expectedType === "string") {
       const invalidCategorySlug =
-        field === "category" && !/^[a-z][a-z0-9-]{0,126}$/.test(item);
+        rules.slug === true && !/^[a-z][a-z0-9-]{0,126}$/.test(item);
       if (
         item.trim().length === 0 ||
         item.length > MAX_STRING_LENGTH ||
@@ -215,7 +109,7 @@ function validateFilterValue(field, operator, value, path, errors) {
           errors,
           itemPath,
           "INVALID_STRING_VALUE",
-          field === "category"
+          rules.slug === true
             ? "Category filters require a lowercase taxonomy slug."
             : `String values must be non-empty and at most ${MAX_STRING_LENGTH} characters.`,
         );
@@ -228,9 +122,11 @@ function validateFilterValue(field, operator, value, path, errors) {
  * Validate and normalize a v1 Cube Query. This function does not authorize a
  * user, create SQL, or execute a query; those remain trusted backend steps.
  * @param {unknown} input
+ * @param {object} model the semantic model document the query is checked against
  * @returns {{ valid: true, query: object } | { valid: false, errors: Array<object> }}
  */
-export function validateCubeQuery(input) {
+export function validateCubeQuery(input, model) {
+  const engine = engineFor(model);
   const errors = [];
   if (!isRecord(input)) {
     return {
@@ -277,12 +173,12 @@ export function validateCubeQuery(input) {
       "Only Cube Query version 1 is supported.",
     );
   }
-  if (input.model !== MODEL) {
+  if (input.model !== engine.code) {
     addError(
       errors,
       "$.model",
       "UNKNOWN_MODEL",
-      `Only model '${MODEL}' is supported.`,
+      `Only model '${engine.code}' is supported.`,
     );
   }
   const mode =
@@ -307,7 +203,9 @@ export function validateCubeQuery(input) {
         "INVALID_MEASURES",
         "Provide exactly one supported measure.",
       );
-    } else if (input.measures.some((measure) => !MEASURES.has(measure))) {
+    } else if (
+      input.measures.some((measure) => !engine.measures.has(measure))
+    ) {
       addError(
         errors,
         "$.measures",
@@ -348,18 +246,18 @@ export function validateCubeQuery(input) {
     if (
       !Array.isArray(input.fields) ||
       input.fields.length < 1 ||
-      input.fields.length > 25
+      input.fields.length > engine.limits.maxRecordFields
     ) {
       addError(
         errors,
         "$.fields",
         "INVALID_FIELDS",
-        "Select between 1 and 25 approved record fields.",
+        `Select between 1 and ${engine.limits.maxRecordFields} approved record fields.`,
       );
     } else {
       const seen = new Set();
       input.fields.forEach((field, index) => {
-        if (!DETAIL_FIELDS.has(field))
+        if (!engine.detailFields.has(field))
           addError(
             errors,
             `$.fields[${index}]`,
@@ -380,18 +278,18 @@ export function validateCubeQuery(input) {
 
   if (
     !Array.isArray(input.dimensions) ||
-    input.dimensions.length > MAX_DIMENSIONS
+    input.dimensions.length > engine.limits.maxDimensions
   ) {
     addError(
       errors,
       "$.dimensions",
       "INVALID_DIMENSIONS",
-      `Provide an array of at most ${MAX_DIMENSIONS} dimensions.`,
+      `Provide an array of at most ${engine.limits.maxDimensions} dimensions.`,
     );
   } else {
     const seen = new Set();
     input.dimensions.forEach((dimension, index) => {
-      if (!DIMENSIONS.has(dimension)) {
+      if (!engine.dimensions.has(dimension)) {
         addError(
           errors,
           `$.dimensions[${index}]`,
@@ -410,12 +308,15 @@ export function validateCubeQuery(input) {
     });
   }
 
-  if (!Array.isArray(input.filters) || input.filters.length > MAX_FILTERS) {
+  if (
+    !Array.isArray(input.filters) ||
+    input.filters.length > engine.limits.maxFilters
+  ) {
     addError(
       errors,
       "$.filters",
       "INVALID_FILTERS",
-      `Provide an array of at most ${MAX_FILTERS} filters.`,
+      `Provide an array of at most ${engine.limits.maxFilters} filters.`,
     );
   } else {
     input.filters.forEach((filter, index) => {
@@ -440,7 +341,7 @@ export function validateCubeQuery(input) {
           );
         }
       }
-      if (!FILTER_FIELDS.has(filter.field)) {
+      if (!engine.filterFields.has(filter.field)) {
         addError(
           errors,
           `${path}.field`,
@@ -449,6 +350,7 @@ export function validateCubeQuery(input) {
         );
       } else if (typeof filter.operator === "string") {
         validateFilterValue(
+          engine,
           filter.field,
           filter.operator,
           filter.value,
@@ -505,7 +407,7 @@ export function validateCubeQuery(input) {
             );
           }
         }
-        if (!SORT_FIELDS.has(sort.field)) {
+        if (!engine.sortFields.has(sort.field)) {
           addError(
             errors,
             `${path}.field`,
@@ -548,22 +450,26 @@ export function validateCubeQuery(input) {
     input.limit !== undefined &&
     (!Number.isInteger(input.limit) ||
       input.limit < 1 ||
-      input.limit > MAX_LIMIT)
+      input.limit > engine.limits.maxLimit)
   ) {
     addError(
       errors,
       "$.limit",
       "INVALID_LIMIT",
-      `Limit must be an integer between 1 and ${MAX_LIMIT}.`,
+      `Limit must be an integer between 1 and ${engine.limits.maxLimit}.`,
     );
   }
 
-  if (mode === "records" && input.limit !== undefined && input.limit > 100) {
+  if (
+    mode === "records" &&
+    input.limit !== undefined &&
+    input.limit > engine.limits.maxRecordRows
+  ) {
     addError(
       errors,
       "$.limit",
       "RECORD_LIMIT_EXCEEDED",
-      "Part-detail queries are limited to 100 rows.",
+      `Part-detail queries are limited to ${engine.limits.maxRecordRows} rows.`,
     );
   }
   if (errors.length > 0) return { valid: false, errors };
@@ -572,7 +478,7 @@ export function validateCubeQuery(input) {
     valid: true,
     query: {
       version: 1,
-      model: MODEL,
+      model: engine.code,
       mode,
       measures: mode === "aggregate" ? [...input.measures] : [],
       dimensions: mode === "aggregate" ? [...input.dimensions] : [],
@@ -590,7 +496,7 @@ export function validateCubeQuery(input) {
               direction,
             })),
           }),
-      limit: input.limit ?? DEFAULT_LIMIT,
+      limit: input.limit ?? engine.limits.defaultLimit,
     },
   };
 }

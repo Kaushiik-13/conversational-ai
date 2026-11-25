@@ -72,11 +72,12 @@ describe('ConversationService natural-language planning', () => {
       name: 'CubeQueryValidationError',
       errors: [{ path: 'measures', message: 'Unknown measure.' }],
     });
-    (
-      service as unknown as {
-        loadCubeQueryModule: jest.Mock;
-      }
-    ).loadCubeQueryModule = jest.fn().mockResolvedValue({
+    const internals = service as unknown as {
+      loadCubeQueryModule: jest.Mock;
+      loadModel: jest.Mock;
+    };
+    internals.loadModel = jest.fn().mockResolvedValue({});
+    internals.loadCubeQueryModule = jest.fn().mockResolvedValue({
       compileCubeQuery: jest.fn(() => {
         throw validationError;
       }),
