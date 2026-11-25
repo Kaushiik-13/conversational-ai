@@ -52,6 +52,7 @@ export class QueryPlannerService {
   constructor(private readonly llm: LlmService) {}
 
   private schemaPromise?: Promise<Record<string, unknown>>;
+  private readonly schemas = new WeakMap<object, Record<string, unknown>>();
 
   async plan(
     question: string,
@@ -76,7 +77,7 @@ export class QueryPlannerService {
     );
     if (explicitPartDetails) return this.validatePlan(explicitPartDetails);
 
-    const schema = await this.loadPlanSchema();
+    const schema = await this.planSchemaFor(semantic);
 
     const initialPlan = await this.requestPlan(
       this.buildMessages(question, history, semantic),
@@ -704,7 +705,7 @@ export class QueryPlannerService {
     history: ConversationHistoryItem[],
     semantic: SemanticModel,
   ): Promise<ConversationPlan> {
-    const schema = await this.loadPlanSchema();
+    const schema = await this.planSchemaFor(semantic);
     const messages = this.buildMessages(question, history, semantic);
     messages.push(
       {
@@ -1064,6 +1065,32 @@ export class QueryPlannerService {
       message:
         'The model returned a plan that the application could not safely use.',
     });
+  }
+
+  /**
+   * The plan schema narrowed to this model: its code and only the measures
+   * the user's role may use, so the model is never offered a hidden field.
+   */
+  private async planSchemaFor(
+    semantic: SemanticModel,
+  ): Promise<Record<string, unknown>> {
+    const cached = this.schemas.get(semantic);
+    if (cached) return cached;
+    const schema = structuredClone(await this.loadPlanSchema()) as {
+      $defs: {
+        cubeQuery: {
+          properties: {
+            model: { const: string };
+            measures: { items: { enum: string[] } };
+          };
+        };
+      };
+    };
+    const properties = schema.$defs.cubeQuery.properties;
+    properties.model.const = semantic.model;
+    properties.measures.items.enum = Object.keys(semantic.measures);
+    this.schemas.set(semantic, schema);
+    return schema;
   }
 
   private loadPlanSchema(): Promise<Record<string, unknown>> {

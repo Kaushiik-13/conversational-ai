@@ -625,4 +625,55 @@ describe('QueryPlannerService', () => {
     });
     fetchMock.mockRestore();
   });
+  it('offers the model only the measures and prompt fields the role may use', async () => {
+    const restricted = structuredClone(AUTOMOTIVE_MODEL);
+    for (const name of [
+      'total_cost_usd',
+      'average_cost_usd',
+      'min_cost_usd',
+      'max_cost_usd',
+    ]) {
+      delete restricted.measures[name];
+    }
+    delete restricted.dimensions.cost_usd;
+    delete restricted.record_fields?.cost_usd;
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          message: { content: '{"status":"unsupported","cube_query":null}' },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await new QueryPlannerService().plan(
+      'Give me a comparative insight into parts.',
+      [],
+      restricted,
+    );
+
+    const init = fetchMock.mock.calls[0]?.[1];
+    if (typeof init?.body !== 'string')
+      throw new Error('Expected JSON request body.');
+    const request = JSON.parse(init.body) as CapturedOllamaRequest & {
+      format: {
+        $defs: {
+          cubeQuery: {
+            properties: {
+              model: { const: string };
+              measures: { items: { enum: string[] } };
+            };
+          };
+        };
+      };
+    };
+    const properties = request.format.$defs.cubeQuery.properties;
+    expect(properties.measures.items.enum).toContain('part_count');
+    expect(properties.measures.items.enum).toContain('total_weight_kg');
+    expect(properties.measures.items.enum).not.toContain('total_cost_usd');
+    expect(properties.model.const).toBe('automotive_catalog');
+    expect(request.messages[0].content).not.toContain('cost_usd');
+    expect(JSON.stringify(request)).not.toContain('cost_usd');
+    fetchMock.mockRestore();
+  });
 });
