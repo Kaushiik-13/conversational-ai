@@ -38,18 +38,22 @@ measures:
     description: Sum of recorded part costs in US dollars.
     aggregation: sum
     expression: part.cost_usd
+    access: { resource_type: catalog.part, field_name: costUsd }
   average_cost_usd:
     description: Average recorded part cost in US dollars.
     aggregation: average
     expression: part.cost_usd
+    access: { resource_type: catalog.part, field_name: costUsd }
   min_cost_usd:
     description: Lowest recorded part cost in US dollars.
     aggregation: minimum
     expression: part.cost_usd
+    access: { resource_type: catalog.part, field_name: costUsd }
   max_cost_usd:
     description: Highest recorded part cost in US dollars.
     aggregation: maximum
     expression: part.cost_usd
+    access: { resource_type: catalog.part, field_name: costUsd }
   total_weight_kg:
     description: Sum of recorded part weights in kilograms.
     aggregation: sum
@@ -177,6 +181,7 @@ dimensions:
   supplier_status:
     description: Supplier status recorded for the catalog part.
     expression: part.supplier_status
+    access: { resource_type: catalog.part, field_name: supplierStatus }
     type: string
     groupable: true
     filterable: true
@@ -184,6 +189,7 @@ dimensions:
   cost_usd:
     description: Recorded part cost in US dollars. This is a catalog value, not a live quote.
     expression: part.cost_usd
+    access: { resource_type: catalog.part, field_name: costUsd }
     type: number
     groupable: true
     filterable: true
@@ -273,8 +279,18 @@ record_fields:
   model_year: { description: Associated model year, type: integer }
   material: { description: Recorded part material, type: string }
   lifecycle_status: { description: Part lifecycle status, type: string }
-  supplier_status: { description: Supplier status, type: string }
-  cost_usd: { description: Recorded cost in US dollars, type: number }
+  supplier_status:
+    {
+      description: Supplier status,
+      type: string,
+      access: { resource_type: catalog.part, field_name: supplierStatus },
+    }
+  cost_usd:
+    {
+      description: Recorded cost in US dollars,
+      type: number,
+      access: { resource_type: catalog.part, field_name: costUsd },
+    }
   weight_kg: { description: Recorded weight in kilograms, type: number }
   active: { description: Whether the catalog record is active, type: boolean }
   document_version: { description: Source document version, type: integer }

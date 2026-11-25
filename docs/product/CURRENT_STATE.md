@@ -28,17 +28,18 @@ Question (+ history)
 
 ## Gaps against the target
 
-| #   | Gap                                                                      | Target                                                                                 |
-| --- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| 1   | One hard-coded model (`semantic/automotive/catalog.yaml`, one table)     | Per-organization, versioned model in the database                                      |
-| 2   | About 1,000 lines of regex shortcuts before the LLM, automotive-specific | LLM-led planning; code keeps validation, caching, matching                             |
-| 3   | Ollama only, 4k context, no streaming                                    | Provider interface, cloud model first, streaming                                       |
-| 4   | Plan covers measures, group-by, filters, top-N                           | Add period comparison, share of total, ratios, running totals, top-N per group, nested |
-| 5   | Whole model in every prompt                                              | Embedding retrieval of the relevant slice                                              |
-| 6   | Value matching hard-coded for a few cases                                | General value matching from sample values and the data                                 |
-| 7   | Answer is a table                                                        | Table, chart, summary, interpretation line, plan and SQL panel                         |
-| 8   | No saved threads, boards or feedback                                     | Persisted threads, boards, ratings, evaluation loop                                    |
-| 9   | No way to connect another database                                       | Organization connections with read-only credentials and schema scan                    |
+| #   | Gap                                                                                                                                                                                                              | Target                                                                                 |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 1   | One hard-coded model (`semantic/automotive/catalog.yaml`, one table)                                                                                                                                             | Per-organization, versioned model in the database                                      |
+| 2   | About 1,000 lines of regex shortcuts before the LLM, automotive-specific                                                                                                                                         | LLM-led planning; code keeps validation, caching, matching                             |
+| 3   | Ollama only, 4k context, no streaming                                                                                                                                                                            | Provider interface, cloud model first, streaming                                       |
+| 4   | Plan covers measures, group-by, filters, top-N                                                                                                                                                                   | Add period comparison, share of total, ratios, running totals, top-N per group, nested |
+| 5   | Whole model in every prompt                                                                                                                                                                                      | Embedding retrieval of the relevant slice                                              |
+| 6   | Value matching hard-coded for a few cases                                                                                                                                                                        | General value matching from sample values and the data                                 |
+| 7   | Answer is a table                                                                                                                                                                                                | Table, chart, summary, interpretation line, plan and SQL panel                         |
+| 8   | No saved threads, boards or feedback                                                                                                                                                                             | Persisted threads, boards, ratings, evaluation loop                                    |
+| 10  | Chat ignores field access rules: `cost_usd` and `supplier_status` are valid chat fields for any role with `catalog.read`, although search and catalog hide them (found by reading code, not yet reproduced live) | Chat applies the same field access as the rest of the app (Phase 1)                    |
+| 9   | No way to connect another database                                                                                                                                                                               | Organization connections with read-only credentials and schema scan                    |
 
 ## Repository today
 
