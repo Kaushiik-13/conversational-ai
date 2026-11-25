@@ -1,5 +1,6 @@
 import {
   Boxes,
+  Cuboid,
   GitCompareArrows,
   MessagesSquare,
   Network,
@@ -42,6 +43,14 @@ export const NAV: NavItem[] = [
     label: "Compare",
     href: "/compare",
     icon: GitCompareArrows,
+    capability: "catalog.read",
+    ready: true,
+    group: "main",
+  },
+  {
+    label: "Playground",
+    href: "/playground",
+    icon: Cuboid,
     capability: "catalog.read",
     ready: true,
     group: "main",
