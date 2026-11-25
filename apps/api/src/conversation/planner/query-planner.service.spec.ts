@@ -1,5 +1,49 @@
-import { QueryPlannerService } from './query-planner.service';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import {
+  QueryPlannerService as RealQueryPlannerService,
+  type SemanticModel,
+} from './query-planner.service';
+import type { ConversationHistoryItem } from './query-planner.service';
+
+// The automotive model document. A cube-query test keeps this fixture equal to
+// the conversion of semantic/automotive/catalog.yaml.
+const AUTOMOTIVE_MODEL = JSON.parse(
+  readFileSync(
+    resolve(
+      __dirname,
+      '../../../../../packages/cube-query/test/fixtures/automotive-model.json',
+    ),
+    'utf8',
+  ),
+) as SemanticModel;
+
+/** Plans against the automotive model so each case reads like a question. */
+class QueryPlannerService extends RealQueryPlannerService {
+  override plan(
+    question: string,
+    history: ConversationHistoryItem[] = [],
+    model: SemanticModel = AUTOMOTIVE_MODEL,
+  ) {
+    return super.plan(question, history, model);
+  }
+
+  override repairInvalidQuery(
+    question: string,
+    invalidCubeQuery: unknown,
+    validationErrors: unknown,
+    history: ConversationHistoryItem[] = [],
+    model: SemanticModel = AUTOMOTIVE_MODEL,
+  ) {
+    return super.repairInvalidQuery(
+      question,
+      invalidCubeQuery,
+      validationErrors,
+      history,
+      model,
+    );
+  }
+}
 
 interface CapturedOllamaRequest {
   model: string;
@@ -10,17 +54,12 @@ interface CapturedOllamaRequest {
 }
 
 describe('QueryPlannerService', () => {
-  const previousSemanticPath = process.env.SEMANTIC_MODEL_PATH;
   const previousSchemaPath = process.env.CONVERSATION_PLAN_SCHEMA_PATH;
   const previousModel = process.env.OLLAMA_MODEL;
   const previousBaseUrl = process.env.OLLAMA_BASE_URL;
   const previousProvider = process.env.CONVERSATION_LLM_PROVIDER;
 
   beforeAll(() => {
-    process.env.SEMANTIC_MODEL_PATH = resolve(
-      __dirname,
-      '../../../../../semantic/automotive/catalog.yaml',
-    );
     process.env.CONVERSATION_PLAN_SCHEMA_PATH = resolve(
       __dirname,
       '../../../../../packages/cube-query/conversation-plan.v1.schema.json',
@@ -35,9 +74,6 @@ describe('QueryPlannerService', () => {
   });
 
   afterAll(() => {
-    if (previousSemanticPath === undefined)
-      delete process.env.SEMANTIC_MODEL_PATH;
-    else process.env.SEMANTIC_MODEL_PATH = previousSemanticPath;
     if (previousSchemaPath === undefined)
       delete process.env.CONVERSATION_PLAN_SCHEMA_PATH;
     else process.env.CONVERSATION_PLAN_SCHEMA_PATH = previousSchemaPath;

@@ -1,0 +1,436 @@
+{
+  "schema_version": 1,
+  "model": "automotive_catalog",
+  "description": "Read-only analytics model for catalog parts. This file is a reviewed semantic definition; it does not execute queries or establish authorization.",
+  "source": {
+    "table": "catalog.part_catalog",
+    "alias": "part",
+    "grain": "one row per catalog part"
+  },
+  "authorization": {
+    "require_permission": "catalog.read"
+  },
+  "measures": {
+    "part_count": {
+      "description": "Number of distinct catalog parts visible to the authenticated user.",
+      "aggregation": "count_distinct",
+      "column": "id"
+    },
+    "manufacturer_count": {
+      "description": "Number of distinct manufacturers represented in visible catalog parts.",
+      "aggregation": "count_distinct",
+      "column": "manufacturer"
+    },
+    "total_cost_usd": {
+      "description": "Sum of recorded part costs in US dollars.",
+      "aggregation": "sum",
+      "access": {
+        "resource_type": "catalog.part",
+        "field_name": "costUsd"
+      },
+      "column": "cost_usd"
+    },
+    "average_cost_usd": {
+      "description": "Average recorded part cost in US dollars.",
+      "aggregation": "average",
+      "access": {
+        "resource_type": "catalog.part",
+        "field_name": "costUsd"
+      },
+      "column": "cost_usd"
+    },
+    "min_cost_usd": {
+      "description": "Lowest recorded part cost in US dollars.",
+      "aggregation": "minimum",
+      "access": {
+        "resource_type": "catalog.part",
+        "field_name": "costUsd"
+      },
+      "column": "cost_usd"
+    },
+    "max_cost_usd": {
+      "description": "Highest recorded part cost in US dollars.",
+      "aggregation": "maximum",
+      "access": {
+        "resource_type": "catalog.part",
+        "field_name": "costUsd"
+      },
+      "column": "cost_usd"
+    },
+    "total_weight_kg": {
+      "description": "Sum of recorded part weights in kilograms.",
+      "aggregation": "sum",
+      "column": "weight_kg"
+    },
+    "average_weight_kg": {
+      "description": "Average recorded part weight in kilograms.",
+      "aggregation": "average",
+      "column": "weight_kg"
+    },
+    "min_weight_kg": {
+      "description": "Lowest recorded part weight in kilograms.",
+      "aggregation": "minimum",
+      "column": "weight_kg"
+    },
+    "max_weight_kg": {
+      "description": "Highest recorded part weight in kilograms.",
+      "aggregation": "maximum",
+      "column": "weight_kg"
+    }
+  },
+  "dimensions": {
+    "manufacturer": {
+      "description": "Component manufacturer recorded on the catalog part.",
+      "type": "string",
+      "groupable": true,
+      "filterable": true,
+      "aliases": ["maker", "brand", "manufacturer name", "made by"],
+      "column": "manufacturer"
+    },
+    "commodity": {
+      "description": "Top-level commodity classification.",
+      "type": "string",
+      "groupable": true,
+      "filterable": true,
+      "known_values": [
+        "ADAS",
+        "Battery",
+        "Body",
+        "Braking",
+        "Electrical",
+        "Engine",
+        "Interior",
+        "Safety",
+        "Steering",
+        "Suspension",
+        "Thermal",
+        "Transmission",
+        "Tyres and Wheels"
+      ],
+      "synonyms": {
+        "brake parts": "Braking",
+        "brake components": "Braking",
+        "braking components": "Braking"
+      },
+      "column": "commodity"
+    },
+    "sub_commodity": {
+      "description": "More specific commodity classification.",
+      "type": "string",
+      "groupable": true,
+      "filterable": true,
+      "aliases": [
+        "sub commodity",
+        "sub-commodity",
+        "product type",
+        "part type"
+      ],
+      "column": "sub_commodity"
+    },
+    "vehicle_program": {
+      "description": "Vehicle program associated with the part; this is not a vehicle make.",
+      "type": "string",
+      "groupable": true,
+      "filterable": true,
+      "aliases": ["vehicle program", "vehicle project", "program"],
+      "column": "vehicle_program"
+    },
+    "region": {
+      "description": "Region associated with the part record.",
+      "type": "string",
+      "groupable": true,
+      "filterable": true,
+      "aliases": ["region", "geography", "market region"],
+      "known_values": [
+        "Africa",
+        "Asia",
+        "Europe",
+        "Middle East",
+        "North America",
+        "Oceania",
+        "South America"
+      ],
+      "column": "region"
+    },
+    "country": {
+      "description": "Country associated with the part record.",
+      "type": "string",
+      "groupable": true,
+      "filterable": true,
+      "aliases": ["country", "nation"],
+      "column": "country"
+    },
+    "plant": {
+      "description": "Plant associated with the part record.",
+      "type": "string",
+      "groupable": true,
+      "filterable": true,
+      "aliases": ["plant", "factory", "facility"],
+      "column": "plant"
+    },
+    "model_year": {
+      "description": "Model year associated with the part record.",
+      "type": "integer",
+      "groupable": true,
+      "filterable": true,
+      "aliases": ["model year", "model-year", "vehicle year"],
+      "column": "model_year"
+    },
+    "lifecycle_status": {
+      "description": "Lifecycle status recorded on the part.",
+      "type": "string",
+      "groupable": true,
+      "filterable": true,
+      "known_values": [
+        "active",
+        "prototype",
+        "superseded",
+        "obsolete",
+        "end-of-life"
+      ],
+      "column": "lifecycle_status"
+    },
+    "active": {
+      "description": "Whether the catalog record is active.",
+      "type": "boolean",
+      "groupable": true,
+      "filterable": true,
+      "column": "active"
+    },
+    "material": {
+      "description": "Material recorded for the catalog part.",
+      "type": "string",
+      "groupable": true,
+      "filterable": true,
+      "aliases": ["material", "made of", "material type"],
+      "column": "material"
+    },
+    "supplier_status": {
+      "description": "Supplier status recorded for the catalog part.",
+      "type": "string",
+      "groupable": true,
+      "filterable": true,
+      "aliases": ["supplier status", "supplier state"],
+      "access": {
+        "resource_type": "catalog.part",
+        "field_name": "supplierStatus"
+      },
+      "column": "supplier_status"
+    },
+    "cost_usd": {
+      "description": "Recorded part cost in US dollars. This is a catalog value, not a live quote.",
+      "type": "number",
+      "groupable": true,
+      "filterable": true,
+      "aliases": ["cost", "price in dollars", "cost in usd"],
+      "access": {
+        "resource_type": "catalog.part",
+        "field_name": "costUsd"
+      },
+      "column": "cost_usd"
+    },
+    "weight_kg": {
+      "description": "Recorded part weight in kilograms.",
+      "type": "number",
+      "groupable": true,
+      "filterable": true,
+      "aliases": ["weight", "mass", "weight in kilograms"],
+      "column": "weight_kg"
+    },
+    "document_version": {
+      "description": "Version number of the source catalog document.",
+      "type": "integer",
+      "groupable": true,
+      "filterable": true,
+      "aliases": ["document version", "source version"],
+      "column": "document_version"
+    },
+    "category": {
+      "description": "Catalog category assigned to the part.",
+      "type": "string",
+      "groupable": true,
+      "filterable": true,
+      "known_values": ["brake-pads"],
+      "synonyms": {
+        "brake pad": "brake-pads",
+        "brake pads": "brake-pads",
+        "brake-pad": "brake-pads"
+      },
+      "strategy": "category_tree"
+    }
+  },
+  "lookup_fields": {
+    "part_number": {
+      "filterable": true,
+      "groupable": false,
+      "aliases": ["part number", "part no", "sku"],
+      "type": "string",
+      "column": "part_number"
+    },
+    "part_name": {
+      "description": "Name or partial text in the catalog part name.",
+      "filterable": true,
+      "groupable": false,
+      "aliases": ["part name", "name"],
+      "type": "string",
+      "column": "part_name"
+    },
+    "description": {
+      "description": "Text recorded in the part description; use contains for text searches.",
+      "filterable": true,
+      "groupable": false,
+      "aliases": ["description", "details", "text"],
+      "type": "string",
+      "column": "description"
+    },
+    "created_at": {
+      "description": "When the catalog record was created; use an ISO date or timestamp.",
+      "filterable": true,
+      "groupable": false,
+      "aliases": ["created", "creation date", "added on"],
+      "type": "timestamp",
+      "column": "created_at"
+    },
+    "updated_at": {
+      "description": "When the catalog record was last updated; use an ISO date or timestamp.",
+      "filterable": true,
+      "groupable": false,
+      "aliases": ["updated", "last updated", "modified on"],
+      "type": "timestamp",
+      "column": "updated_at"
+    }
+  },
+  "record_fields": {
+    "part_number": {
+      "description": "Catalog part number",
+      "type": "string",
+      "column": "part_number"
+    },
+    "part_name": {
+      "description": "Catalog part name",
+      "type": "string",
+      "column": "part_name"
+    },
+    "description": {
+      "description": "Catalog part description",
+      "type": "string",
+      "column": "description"
+    },
+    "commodity": {
+      "description": "Top-level commodity",
+      "type": "string",
+      "column": "commodity"
+    },
+    "sub_commodity": {
+      "description": "More specific commodity",
+      "type": "string",
+      "column": "sub_commodity"
+    },
+    "manufacturer": {
+      "description": "Component manufacturer",
+      "type": "string",
+      "column": "manufacturer"
+    },
+    "vehicle_program": {
+      "description": "Associated vehicle program",
+      "type": "string",
+      "column": "vehicle_program"
+    },
+    "region": {
+      "description": "Region on the catalog record",
+      "type": "string",
+      "column": "region"
+    },
+    "country": {
+      "description": "Country on the catalog record",
+      "type": "string",
+      "column": "country"
+    },
+    "plant": {
+      "description": "Plant on the catalog record",
+      "type": "string",
+      "column": "plant"
+    },
+    "model_year": {
+      "description": "Associated model year",
+      "type": "integer",
+      "column": "model_year"
+    },
+    "material": {
+      "description": "Recorded part material",
+      "type": "string",
+      "column": "material"
+    },
+    "lifecycle_status": {
+      "description": "Part lifecycle status",
+      "type": "string",
+      "column": "lifecycle_status"
+    },
+    "supplier_status": {
+      "description": "Supplier status",
+      "type": "string",
+      "access": {
+        "resource_type": "catalog.part",
+        "field_name": "supplierStatus"
+      },
+      "column": "supplier_status"
+    },
+    "cost_usd": {
+      "description": "Recorded cost in US dollars",
+      "type": "number",
+      "access": {
+        "resource_type": "catalog.part",
+        "field_name": "costUsd"
+      },
+      "column": "cost_usd"
+    },
+    "weight_kg": {
+      "description": "Recorded weight in kilograms",
+      "type": "number",
+      "column": "weight_kg"
+    },
+    "active": {
+      "description": "Whether the catalog record is active",
+      "type": "boolean",
+      "column": "active"
+    },
+    "document_version": {
+      "description": "Source document version",
+      "type": "integer",
+      "column": "document_version"
+    },
+    "created_at": {
+      "description": "When the catalog record was created",
+      "type": "timestamp",
+      "column": "created_at"
+    },
+    "updated_at": {
+      "description": "When the catalog record was last updated",
+      "type": "timestamp",
+      "column": "updated_at"
+    },
+    "category": {
+      "description": "Categories assigned to the part",
+      "type": "string[]",
+      "strategy": "category_tree"
+    }
+  },
+  "excluded_fields": [
+    "tenant_id",
+    "company_id",
+    "security_domain_id",
+    "visibility_status",
+    "source_system",
+    "source_record_id",
+    "id",
+    "primary_category_id"
+  ],
+  "limits": {
+    "max_dimensions_per_query": 5,
+    "max_filters_per_query": 15,
+    "default_result_limit": 50,
+    "max_result_limit": 500,
+    "max_record_fields": 25,
+    "max_record_rows": 100
+  }
+}

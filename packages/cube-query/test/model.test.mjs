@@ -126,3 +126,18 @@ test("checksum ignores key order and changes with content", () => {
   assert.notEqual(modelChecksum(document), modelChecksum(changed));
   assert.match(modelChecksum(document), /^[0-9a-f]{64}$/);
 });
+
+test("the committed automotive model fixture matches the YAML conversion", async () => {
+  const { readFileSync } = await import("node:fs");
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL("./fixtures/automotive-model.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.deepEqual(
+    fixture,
+    converted(),
+    "Regenerate packages/cube-query/test/fixtures/automotive-model.json from semantic/automotive/catalog.yaml.",
+  );
+});

@@ -21,6 +21,7 @@
     "db:migrate": "node --env-file=.env database/migrations/migrate.mjs",
     "db:seed": "node --env-file=.env database/seeds/seed.mjs",
     "db:seed:semantic": "node --env-file=.env database/seeds/import-semantic-model.mjs",
+    "db:validate:chat-access": "node --env-file=.env database/validation/chat-field-access.mjs",
     "db:validate:semantic": "node --env-file=.env database/validation/semantic-models.mjs",
     "db:bootstrap:accounts": "node --env-file=.env database/seeds/bootstrap-development-accounts.mjs",
     "db:generate:catalog": "node --env-file=.env database/generators/generate-catalog.mjs --count 5000000",

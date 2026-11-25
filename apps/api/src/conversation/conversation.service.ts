@@ -6,14 +6,16 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { dirname, resolve } from 'node:path';
-import { parse } from 'yaml';
+import { resolve } from 'node:path';
 import type { PoolClient } from 'pg';
 import type { AuthenticatedSession } from '../auth/auth.types';
 import { ApplicationAuditService } from '../common/application-audit.service';
 import { DatabaseService } from '../database/database.service';
+import {
+  SemanticService,
+  type ResolvedModel,
+} from '../semantic/semantic.service';
 import { QueryPlannerService } from './planner/query-planner.service';
 import type {
   ConversationHistoryItem,
@@ -49,18 +51,13 @@ interface CubeQueryModule {
   ): Promise<CubeQueryResult>;
 }
 
-interface ModelModule {
-  convertLegacyModel(definition: unknown): unknown;
-}
-
 @Injectable()
 export class ConversationService {
-  private modelPromise?: Promise<unknown>;
-
   constructor(
     private readonly database: DatabaseService,
     private readonly audit: ApplicationAuditService,
     private readonly planner: QueryPlannerService,
+    private readonly semantic: SemanticService,
   ) {}
 
   async ask(
@@ -77,14 +74,21 @@ export class ConversationService {
       }
     | { status: 'clarification' | 'unsupported'; message: string }
   > {
-    let plan: ConversationPlan = await this.planner.plan(question, history);
+    // The model is the organization's published one, reduced to the fields
+    // this role may use. The planner and the query engine only see that view.
+    const resolved = await this.semantic.resolveForSession(session);
+    const model = resolved.document;
+    let plan: ConversationPlan = await this.planner.plan(
+      question,
+      history,
+      model,
+    );
     if (plan.status !== 'query') {
       return { status: plan.status, message: plan.message };
     }
 
     try {
       const cubeQuery = await this.loadCubeQueryModule();
-      const model = await this.loadModel();
       let validated: CubeQueryResult['query'];
       try {
         validated = cubeQuery.compileCubeQuery(plan.cube_query, model).query;
@@ -97,11 +101,26 @@ export class ConversationService {
         };
         if (queryError.name !== 'CubeQueryValidationError') throw error;
 
+        // A plan that names a field this role may not use is refused here,
+        // with a clear reason, instead of asking the model to rewrite it.
+        const blocked = this.hiddenFieldsUsed(plan.cube_query, resolved.hidden);
+        if (blocked.length > 0) {
+          return {
+            status: 'unsupported',
+            message: `Your role does not have access to ${blocked
+              .map((field) => field.replaceAll('_', ' '))
+              .join(
+                ', ',
+              )}. Ask an administrator for access, or ask about something else.`,
+          };
+        }
+
         plan = await this.planner.repairInvalidQuery(
           question,
           plan.cube_query,
           queryError.errors,
           history,
+          model,
         );
         if (plan.status !== 'query') {
           return { status: plan.status, message: plan.message };
@@ -123,7 +142,7 @@ export class ConversationService {
           throw repairError;
         }
       }
-      const result = await this.query(session, validated, requestId);
+      const result = await this.query(session, validated, requestId, resolved);
       return {
         status: 'answered',
         message: plan.message,
@@ -148,14 +167,17 @@ export class ConversationService {
     session: AuthenticatedSession,
     input: unknown,
     requestId: string,
+    resolvedModel?: ResolvedModel,
   ): Promise<CubeQueryResult> {
     try {
       const cubeQuery = await this.loadCubeQueryModule();
+      const resolved =
+        resolvedModel ?? (await this.semantic.resolveForSession(session));
       const result = await cubeQuery.executeAuthorizedCubeQuery(
         input,
         (operation) =>
           this.database.withAuthorizationContext(session, operation),
-        await this.loadModel(),
+        resolved.document,
       );
 
       await this.audit.record(
@@ -167,6 +189,8 @@ export class ConversationService {
         null,
         {
           model: result.query.model,
+          modelVersion: resolved.versionNumber,
+          modelVersionId: resolved.versionId,
           measures: result.query.measures,
           dimensions: result.query.dimensions,
           mode: result.query.mode ?? 'aggregate',
@@ -208,7 +232,7 @@ export class ConversationService {
     }
   }
 
-  private cubeQueryEntry(): string {
+  private async loadCubeQueryModule(): Promise<CubeQueryModule> {
     const candidates = [
       process.env.CUBE_QUERY_PACKAGE_ENTRY,
       resolve(process.cwd(), '../../packages/cube-query/src/qgen.mjs'),
@@ -219,32 +243,35 @@ export class ConversationService {
       Object.assign(error, { code: 'QUERY_ENGINE_UNAVAILABLE' });
       throw error;
     }
-    return entry;
+    return (await import(pathToFileURL(entry).href)) as CubeQueryModule;
   }
 
-  private async loadCubeQueryModule(): Promise<CubeQueryModule> {
-    return (await import(
-      pathToFileURL(this.cubeQueryEntry()).href
-    )) as CubeQueryModule;
-  }
-
-  /**
-   * The semantic model document the query engine compiles against.
-   * Temporary bridge: converts the reviewed YAML. Phase 1.3 replaces this with
-   * the published model version loaded from the database.
-   */
-  private loadModel(): Promise<unknown> {
-    this.modelPromise ??= (async () => {
-      const modelModule = (await import(
-        pathToFileURL(resolve(dirname(this.cubeQueryEntry()), 'model.mjs')).href
-      )) as ModelModule;
-      const source = await readFile(
-        process.env.SEMANTIC_MODEL_PATH ??
-          resolve(process.cwd(), '../../semantic/automotive/catalog.yaml'),
-        'utf8',
-      );
-      return modelModule.convertLegacyModel(parse(source));
-    })();
-    return this.modelPromise;
+  /** Hidden fields a proposed query names (as measure, dimension, field, filter or sort). */
+  private hiddenFieldsUsed(query: unknown, hidden: string[]): string[] {
+    if (hidden.length === 0 || !query || typeof query !== 'object') return [];
+    const proposal = query as {
+      measures?: unknown;
+      dimensions?: unknown;
+      fields?: unknown;
+      filters?: unknown;
+      order_by?: unknown;
+    };
+    const names = new Set<string>();
+    const addAll = (value: unknown) => {
+      if (Array.isArray(value)) {
+        for (const item of value) if (typeof item === 'string') names.add(item);
+      }
+    };
+    addAll(proposal.measures);
+    addAll(proposal.dimensions);
+    addAll(proposal.fields);
+    for (const group of [proposal.filters, proposal.order_by]) {
+      if (!Array.isArray(group)) continue;
+      for (const entry of group) {
+        const field = (entry as { field?: unknown } | null)?.field;
+        if (typeof field === 'string') names.add(field);
+      }
+    }
+    return hidden.filter((field) => names.has(field));
   }
 }

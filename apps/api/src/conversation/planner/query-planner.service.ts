@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { parse } from 'yaml';
 
 export interface ConversationPlan {
   status: 'query' | 'clarification' | 'unsupported';
@@ -35,7 +34,8 @@ interface SemanticField {
   aliases?: string[];
 }
 
-interface SemanticModel {
+/** The semantic model document (already filtered to what the user may see). */
+export interface SemanticModel {
   model: string;
   description: string;
   measures: Record<string, { description?: string }>;
@@ -53,14 +53,13 @@ interface SemanticModel {
 
 @Injectable()
 export class QueryPlannerService {
-  private semanticModelPromise?: Promise<SemanticModel>;
   private schemaPromise?: Promise<Record<string, unknown>>;
 
   async plan(
     question: string,
-    history: ConversationHistoryItem[] = [],
+    history: ConversationHistoryItem[],
+    semantic: SemanticModel,
   ): Promise<ConversationPlan> {
-    const semantic = await this.loadSemanticModel();
     const deterministicPlan = this.planExactSupportedQuestion(
       question,
       semantic,
@@ -125,6 +124,7 @@ export class QueryPlannerService {
         required_filters: missing,
       },
       history,
+      semantic,
     );
     if (repaired.status !== 'query') return repaired;
 
@@ -703,9 +703,9 @@ export class QueryPlannerService {
     question: string,
     invalidCubeQuery: unknown,
     validationErrors: unknown,
-    history: ConversationHistoryItem[] = [],
+    history: ConversationHistoryItem[],
+    semantic: SemanticModel,
   ): Promise<ConversationPlan> {
-    const semantic = await this.loadSemanticModel();
     const schema = await this.loadPlanSchema();
     const messages = this.buildMessages(question, history, semantic);
     messages.push(
@@ -1134,15 +1134,6 @@ export class QueryPlannerService {
       message:
         'The model returned a plan that the application could not safely use.',
     });
-  }
-
-  private loadSemanticModel(): Promise<SemanticModel> {
-    this.semanticModelPromise ??= readFile(
-      process.env.SEMANTIC_MODEL_PATH ??
-        resolve(process.cwd(), '../../semantic/automotive/catalog.yaml'),
-      'utf8',
-    ).then((source) => parse(source) as SemanticModel);
-    return this.semanticModelPromise;
   }
 
   private loadPlanSchema(): Promise<Record<string, unknown>> {
