@@ -15,7 +15,6 @@ COPY apps/api apps/api
 COPY database/migrations database/migrations
 COPY database/seeds database/seeds
 COPY packages/cube-query /workspace/packages/cube-query
-COPY semantic/automotive/catalog.yaml /workspace/semantic/automotive/catalog.yaml
 
 RUN npm run build --workspace=@automotive-search/api \
     && npm prune --omit=dev --workspace=@automotive-search/api --include-workspace-root
@@ -33,7 +32,6 @@ COPY --from=build --chown=node:node /workspace/apps/api/dist ./apps/api/dist
 COPY --from=build --chown=node:node /workspace/database/migrations ./database/migrations
 COPY --from=build --chown=node:node /workspace/database/seeds ./database/seeds
 COPY --from=build --chown=node:node /workspace/packages/cube-query /workspace/packages/cube-query
-COPY --from=build --chown=node:node /workspace/semantic/automotive/catalog.yaml /workspace/semantic/automotive/catalog.yaml
 
 USER node
 

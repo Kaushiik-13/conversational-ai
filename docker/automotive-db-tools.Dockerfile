@@ -12,5 +12,7 @@ RUN npm ci --omit=dev --workspace=@automotive-search/api --include-workspace-roo
 COPY database/migrations database/migrations
 COPY database/seeds database/seeds
 COPY database/generators database/generators
+COPY packages/cube-query/src packages/cube-query/src
+COPY semantic/automotive/catalog.yaml semantic/automotive/catalog.yaml
 
 USER node

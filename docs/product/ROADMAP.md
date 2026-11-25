@@ -13,6 +13,8 @@ Running example: Acme Retail connects a database with `orders`, `customers`,
 
 ## Phase 1: Foundation
 
+**Status:** Built except the Gemini adapter (needs an API key to verify). See [PHASE1_DESIGN.md](PHASE1_DESIGN.md#13-status-and-deviations-2026-11-25).
+
 - Per-organization semantic model in the database (versions, synonyms, descriptions, sample values).
 - `llm` provider interface with Gemini and Ollama adapters.
 - Automotive becomes organization #1 by importing `semantic/automotive/catalog.yaml`.

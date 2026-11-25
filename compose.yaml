@@ -92,6 +92,16 @@ services:
         condition: service_completed_successfully
     restart: "no"
 
+  seed-semantic:
+    <<: *db-tools
+    command: ["node", "database/seeds/import-semantic-model.mjs"]
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://${POSTGRES_USER:-automotive_owner}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-automotive_search}
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    restart: "no"
+
   bootstrap-accounts:
     <<: *db-tools
     command: ["node", "database/seeds/bootstrap-development-accounts.mjs"]
@@ -138,12 +148,14 @@ services:
       CONVERSATION_LLM_PROVIDER: ${CONVERSATION_LLM_PROVIDER:-ollama}
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:2b}
-      SEMANTIC_MODEL_PATH: /workspace/semantic/automotive/catalog.yaml
+      LLM_ALLOW_EXTERNAL: ${LLM_ALLOW_EXTERNAL:-false}
       CONVERSATION_PLAN_SCHEMA_PATH: /workspace/packages/cube-query/conversation-plan.v1.schema.json
     ports:
       - "${API_PORT:-3000}:3000"
     depends_on:
       bootstrap-accounts:
+        condition: service_completed_successfully
+      seed-semantic:
         condition: service_completed_successfully
       ollama-model:
         condition: service_completed_successfully

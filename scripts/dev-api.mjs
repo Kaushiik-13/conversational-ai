@@ -18,10 +18,6 @@ process.env.CUBE_QUERY_PACKAGE_ENTRY ??= path.join(
   root,
   "packages/cube-query/src/qgen.mjs",
 );
-process.env.SEMANTIC_MODEL_PATH ??= path.join(
-  root,
-  "semantic/automotive/catalog.yaml",
-);
 process.env.CONVERSATION_PLAN_SCHEMA_PATH ??= path.join(
   root,
   "packages/cube-query/conversation-plan.v1.schema.json",

@@ -1,6 +1,7 @@
 # Phase 1 Design: Foundation
 
-**Status:** Proposed 2026-11-25, awaiting approval. No code written yet.
+**Status:** Approved 2026-11-25. Steps 1.1 to 1.5 are built and verified. Step 1.6
+(the Gemini adapter) is not built yet; see "Status and deviations" below.
 **Goal:** move the model of the organization's data out of the code and into the
 database, make the AI provider swappable, and make chat respect field access.
 Users see no change except that chat now hides fields their role may not use.
@@ -226,3 +227,44 @@ provider choice, and removal of the regex shortcuts (Phase 2).
 
 - Approval of D1 to D7, or the changes you want.
 - A Gemini API key for step 1.6, set locally in `.env` (never committed). Not needed before then.
+
+## 13. Status and deviations (2026-11-25)
+
+| Step                            | State         | Evidence                                                                                                                    |
+| ------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 1.1 Migration, seed, validation | Done          | Migration `0028`, `import-semantic-model.mjs`, `db:validate:semantic` (9 checks), clean-database install verified           |
+| 1.2 Model-driven query engine   | Done          | 463-query snapshot from the old engine reproduced byte for byte; engine tests with a second model                           |
+| 1.3 `semantic` module           | Done          | Unit tests; Org A 5,000,000 and Org B 1,250,000 through the live API                                                        |
+| 1.4 Field access enforcement    | Done          | `db:validate:chat-access` against the running API: viewer rejected on every cost and supplier field, administrators allowed |
+| 1.5 `llm` module                | Done          | 18 provider and service tests; Ollama request and error codes unchanged                                                     |
+| 1.6 Gemini adapter              | **Not built** | See below                                                                                                                   |
+| 1.7 Docs, Docker, env           | Done          | Docker `seed-semantic` service verified, `.env.example`, README                                                             |
+
+### Deviations from the design above
+
+1. **Field access rules were missing.** Migration `0010` inserts them before the
+   roles exist, so a freshly built database had no rules and every role,
+   administrators included, fell back to "omit" for cost and supplier fields.
+   Added seed `0002_field_access_rules.sql` with the intended rules. This also
+   changes the catalog: administrators and analysts now see cost and supplier status.
+2. **The plan schema follows the role's model.** The static schema listed every
+   measure, so a restricted role would still have been offered cost measures.
+   It now carries only the measures that role may use.
+3. **Docker.** A `seed-semantic` service runs after `seed`, and the API waits for it.
+   The API image no longer needs the YAML file.
+4. **Fixture.** `packages/cube-query/test/fixtures/automotive-model.json` is the
+   automotive document for the planner and semantic tests. A test fails if it
+   drifts from the YAML conversion.
+5. **Old validation scripts are stale.** `db:validate:phase6` still expects 25
+   migrations and ten `authz_` functions; the database already had 27 migrations
+   before this phase. They were not changed.
+
+### Step 1.6: why it is not built
+
+The Gemini request and response format could not be confirmed. The provider
+documentation now describes an "Interactions" endpoint, and nothing found
+confirms whether the older `generateContent` request is still the supported way
+to ask for structured JSON. Writing the adapter blind would mean shipping code
+that has never talked to the service. It needs a developer API key so the real
+request and response can be checked first. Until then `CONVERSATION_LLM_PROVIDER`
+accepts only `ollama`.

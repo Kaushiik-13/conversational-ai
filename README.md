@@ -38,8 +38,15 @@ with hot reload.
 ```powershell
 docker compose up -d db      # start just the database
 npm install                  # first time only
+npm run db:migrate           # apply migrations (safe to repeat)
+npm run db:seed              # reference data and role field access
+npm run db:seed:semantic     # publish the automotive data model
 npm run dev:local            # NestJS API (3001) + Next.js web (4300)
 ```
+
+The semantic model lives in the database, so chat needs `db:seed:semantic`
+once per database. After a change to `semantic/automotive/catalog.yaml`, run it
+again: it publishes a new version only when the content changed.
 
 Open http://localhost:4300. Use `npm run dev:local:api` or
 `npm run dev:local:web` to run one of them alone. Stop with Ctrl+C.
