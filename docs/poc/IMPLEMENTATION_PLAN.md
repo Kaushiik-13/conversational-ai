@@ -1,5 +1,7 @@
 # Automotive Conversational AI PoC — Implementation Plan
 
+> **Historical (PoC).** Superseded on 2026-11-25 by [../product/](../product/VISION.md). The local-Ollama-only and single-model decisions below no longer apply.
+
 **Status:** Local PoC implementation in progress — Ollama-led question planning, aggregate and part-detail queries, comparisons, and guarded category relationships
 **Reference:** Wren AI  
 **Foundation:** [automotive-search](https://github.com/Kaushiik-13/automotive-search)  

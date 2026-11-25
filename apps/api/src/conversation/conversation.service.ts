@@ -12,11 +12,11 @@ import type { PoolClient } from 'pg';
 import type { AuthenticatedSession } from '../auth/auth.types';
 import { ApplicationAuditService } from '../common/application-audit.service';
 import { DatabaseService } from '../database/database.service';
-import { QueryPlannerService } from './query-planner.service';
+import { QueryPlannerService } from './planner/query-planner.service';
 import type {
   ConversationHistoryItem,
   ConversationPlan,
-} from './query-planner.service';
+} from './planner/query-planner.service';
 
 export interface CubeQueryResult {
   query: {

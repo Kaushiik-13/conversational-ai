@@ -2,7 +2,7 @@ import type { AuthenticatedSession } from '../auth/auth.types';
 import { ApplicationAuditService } from '../common/application-audit.service';
 import { DatabaseService } from '../database/database.service';
 import { ConversationService } from './conversation.service';
-import { QueryPlannerService } from './query-planner.service';
+import { QueryPlannerService } from './planner/query-planner.service';
 
 describe('ConversationService natural-language planning', () => {
   const session: AuthenticatedSession = {

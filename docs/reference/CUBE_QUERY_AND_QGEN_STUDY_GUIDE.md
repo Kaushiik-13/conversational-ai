@@ -31,12 +31,12 @@ flowchart LR
 
 Read these files in this order:
 
-1. [`cube-query.v1.schema.json`](../packages/cube-query/cube-query.v1.schema.json) — the documented JSON shape.
-2. [`index.mjs`](../packages/cube-query/src/index.mjs) — runtime validation and normalization.
-3. [`qgen.mjs`](../packages/cube-query/src/qgen.mjs) — SQL generation and authorized execution helper.
-4. [`cube-query.test.mjs`](../packages/cube-query/test/cube-query.test.mjs) — examples of accepted and rejected requests.
-5. [`conversation.controller.ts`](../apps/api/src/conversation/conversation.controller.ts) and [`conversation.service.ts`](../apps/api/src/conversation/conversation.service.ts) — the authenticated API route that uses the package.
-6. [`database.service.ts`](../apps/api/src/database/database.service.ts) — the existing database transaction and authorization-context boundary.
+1. [`cube-query.v1.schema.json`](../../packages/cube-query/cube-query.v1.schema.json) — the documented JSON shape.
+2. [`index.mjs`](../../packages/cube-query/src/index.mjs) — runtime validation and normalization.
+3. [`qgen.mjs`](../../packages/cube-query/src/qgen.mjs) — SQL generation and authorized execution helper.
+4. [`cube-query.test.mjs`](../../packages/cube-query/test/cube-query.test.mjs) — examples of accepted and rejected requests.
+5. [`conversation.controller.ts`](../../apps/api/src/conversation/conversation.controller.ts) and [`conversation.service.ts`](../../apps/api/src/conversation/conversation.service.ts) — the authenticated API route that uses the package.
+6. [`database.service.ts`](../../apps/api/src/database/database.service.ts) — the existing database transaction and authorization-context boundary.
 
 The JSON Schema describes the contract, but the API currently runs the
 handwritten `validateCubeQuery` function. Keep both aligned when the contract
@@ -67,8 +67,7 @@ The names have specific roles:
   `model_year`.
 - **Filter:** which values to keep.
 - **Order:** optional sorting, using only selected dimensions or measures.
-- **Limit:** maximum returned rows/groups. It defaults to 50 and cannot exceed
-  500.
+- **Limit:** maximum returned rows/groups. It defaults to 50 and cannot exceed 500.
 
 The JSON cannot name a database organization, role, table, arbitrary SQL, or
 database connection. Those choices belong to trusted application code.
@@ -91,12 +90,12 @@ checks:
 
 Operators by field type:
 
-| Field kind | Allowed operators |
-|---|---|
-| Text fields | `equals`, `in`, `contains` |
-| `model_year` | `equals`, `in`, `gt`, `gte`, `lt`, `lte` |
-| `active` | `equals`, `in` |
-| `category` | `equals`, `in` using lowercase taxonomy slugs |
+| Field kind   | Allowed operators                             |
+| ------------ | --------------------------------------------- |
+| Text fields  | `equals`, `in`, `contains`                    |
+| `model_year` | `equals`, `in`, `gt`, `gte`, `lt`, `lte`      |
+| `active`     | `equals`, `in`                                |
+| `category`   | `equals`, `in` using lowercase taxonomy slugs |
 
 `part_number` and `part_name` are lookup filters only. They cannot be selected
 as groupings. Sensitive fields such as cost and supplier status are not in the

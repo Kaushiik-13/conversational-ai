@@ -19,11 +19,11 @@ describe('QueryPlannerService', () => {
   beforeAll(() => {
     process.env.SEMANTIC_MODEL_PATH = resolve(
       __dirname,
-      '../../../../semantic/automotive/catalog.yaml',
+      '../../../../../semantic/automotive/catalog.yaml',
     );
     process.env.CONVERSATION_PLAN_SCHEMA_PATH = resolve(
       __dirname,
-      '../../../../packages/cube-query/conversation-plan.v1.schema.json',
+      '../../../../../packages/cube-query/conversation-plan.v1.schema.json',
     );
     process.env.OLLAMA_MODEL = 'qwen3.5:2b';
     process.env.OLLAMA_BASE_URL = 'http://ollama:11434/';

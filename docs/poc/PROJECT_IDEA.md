@@ -1,5 +1,7 @@
 # Project Idea — Conversational AI for Trusted Business Data
 
+> **Historical (PoC).** Superseded on 2026-11-25 by [../product/](../product/VISION.md). The local-Ollama-only and single-model decisions below no longer apply.
+
 **Working name:** Conversational AI  
 **First domain:** Automotive catalog analytics  
 **Initial data source:** Existing PostgreSQL/ParadeDB automotive-search project  

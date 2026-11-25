@@ -1,0 +1,7 @@
+# Documentation
+
+| Folder                   | Purpose                                                                                                                                                                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [product/](product/)     | Current direction: [vision](product/VISION.md), [architecture](product/ARCHITECTURE.md), [current state and gaps](product/CURRENT_STATE.md), [roadmap](product/ROADMAP.md), [decision log](product/DECISIONS.md)                         |
+| [reference/](reference/) | Stable technical references: [automotive data setup](reference/AUTOMOTIVE_DATA_SETUP.md), [automotive semantic model](reference/AUTOMOTIVE_SEMANTIC_MODEL.md), [Cube Query and QGen guide](reference/CUBE_QUERY_AND_QGEN_STUDY_GUIDE.md) |
+| [poc/](poc/)             | Original proof-of-concept documents. Historical: the local-only model decision there is superseded by `product/DECISIONS.md`.                                                                                                            |
