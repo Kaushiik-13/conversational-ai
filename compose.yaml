@@ -151,6 +151,8 @@ services:
       LLM_ALLOW_EXTERNAL: ${LLM_ALLOW_EXTERNAL:-false}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.1-flash-lite}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
       CONVERSATION_PLAN_SCHEMA_PATH: /workspace/packages/cube-query/conversation-plan.v1.schema.json
     ports:
       - "${API_PORT:-3000}:3000"
