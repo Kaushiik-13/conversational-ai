@@ -149,6 +149,8 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:2b}
       LLM_ALLOW_EXTERNAL: ${LLM_ALLOW_EXTERNAL:-false}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.1-flash-lite}
       CONVERSATION_PLAN_SCHEMA_PATH: /workspace/packages/cube-query/conversation-plan.v1.schema.json
     ports:
       - "${API_PORT:-3000}:3000"

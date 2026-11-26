@@ -1,7 +1,7 @@
 # Phase 1 Design: Foundation
 
-**Status:** Approved 2026-11-25. Steps 1.1 to 1.5 are built and verified. Step 1.6
-(the Gemini adapter) is not built yet; see "Status and deviations" below.
+**Status:** Approved 2026-11-25. All steps built and verified; the Gemini adapter
+(1.6) was checked live on 2026-11-26. See "Status and deviations" below.
 **Goal:** move the model of the organization's data out of the code and into the
 database, make the AI provider swappable, and make chat respect field access.
 Users see no change except that chat now hides fields their role may not use.
@@ -237,7 +237,7 @@ provider choice, and removal of the regex shortcuts (Phase 2).
 | 1.3 `semantic` module           | Done          | Unit tests; Org A 5,000,000 and Org B 1,250,000 through the live API                                                        |
 | 1.4 Field access enforcement    | Done          | `db:validate:chat-access` against the running API: viewer rejected on every cost and supplier field, administrators allowed |
 | 1.5 `llm` module                | Done          | 18 provider and service tests; Ollama request and error codes unchanged                                                     |
-| 1.6 Gemini adapter              | **Not built** | See below                                                                                                                   |
+| 1.6 Gemini adapter              | Done          | 11 mocked tests plus a live check through the API (see below)                                                              |
 | 1.7 Docs, Docker, env           | Done          | Docker `seed-semantic` service verified, `.env.example`, README                                                             |
 
 ### Deviations from the design above
@@ -259,12 +259,30 @@ provider choice, and removal of the regex shortcuts (Phase 2).
    migrations and ten `authz_` functions; the database already had 27 migrations
    before this phase. They were not changed.
 
-### Step 1.6: why it is not built
+### Step 1.6: Gemini adapter (built and checked live, 2026-11-26)
 
-The Gemini request and response format could not be confirmed. The provider
-documentation now describes an "Interactions" endpoint, and nothing found
-confirms whether the older `generateContent` request is still the supported way
-to ask for structured JSON. Writing the adapter blind would mean shipping code
-that has never talked to the service. It needs a developer API key so the real
-request and response can be checked first. Until then `CONVERSATION_LLM_PROVIDER`
-accepts only `ollama`.
+Checked against the real service with a developer key before writing the adapter.
+
+- **Request:** `POST {base}/models/{model}:generateContent`, key in the
+  `x-goog-api-key` header (never in the URL), `systemInstruction`, `contents`,
+  and `generationConfig` with `responseMimeType: application/json` and
+  `responseJsonSchema`. Works with our plan schema, including `$defs` and `$ref`.
+- **Response:** `candidates[0].content.parts[].text` (reasoning parts are marked
+  `thought` and skipped), `finishReason`, `usageMetadata`.
+- **Models:** `gemini-2.5-flash` is retired for new keys (404). Default is
+  `gemini-3.1-flash-lite`; change it with `GEMINI_MODEL`.
+- **`const` is not enforced.** Gemini returned `"model":"parts"` for a schema that
+  pins `"model":"automotive_catalog"`. The engine's validation after the plan is
+  the real guard; the schema is a hint.
+- **Live check through the API:** "How many parts are there per category?" answered
+  for administrator and viewer; "tell me a joke" refused politely; a viewer asking
+  for total cost was told the catalog has no cost data. Latency 1 to 6 seconds,
+  about 1,100 input and 50 to 90 output tokens per call.
+- **Known gap (Phase 2):** "which suppliers do we rely on the most" returned
+  `INVALID_MODEL_QUERY` (502) after the one repair attempt. The server rejected the
+  plan correctly, but the user gets an error instead of a clarifying question or an
+  honest refusal.
+
+Set `CONVERSATION_LLM_PROVIDER=gemini`, `LLM_ALLOW_EXTERNAL=true` and
+`GEMINI_API_KEY` in `.env`. Free-tier prompts may be used by the provider, so use
+it for development only.
