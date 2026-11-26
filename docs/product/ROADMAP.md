@@ -1,6 +1,6 @@
 # Roadmap
 
-**Status:** 2026-11-25. Nothing below Phase 0 is started. Each phase needs an approved change set before code.
+**Status:** 2026-11-26. Phases 0 and 1 are done; Phase 2 design is approved. Each phase needs an approved change set before code.
 
 Running example: Acme Retail connects a database with `orders`, `customers`,
 `products` and asks "Top 5 regions by revenue last quarter, electronics only."
@@ -24,7 +24,9 @@ Running example: Acme Retail connects a database with `orders`, `customers`,
 
 ## Phase 2: Planner (largest phase)
 
-- Field retrieval (embeddings), value matching, LLM plan, validation, one retry.
+**Status:** Design approved 2026-11-26, see [PHASE2_DESIGN.md](PHASE2_DESIGN.md). Embeddings moved to Phase 4; contract widening is Phase 2B.
+
+- Value matching, LLM plan, validation, one retry (embeddings moved to Phase 4).
 - Wider plan contract (period comparison, share of total, ratios, running totals, top-N per group, nested).
 - Clarifying questions and honest refusal with a suggestion.
 - Evaluation: about 50 questions times 10 phrasings per organization, gating every change.
@@ -43,6 +45,7 @@ Running example: Acme Retail connects a database with `orders`, `customers`,
 ## Phase 4: Model builder
 
 - Connect PostgreSQL with read-only credentials.
+- Field retrieval with embeddings for large schemas (moved from Phase 2).
 - Schema scan, auto-drafted model with synonyms, admin edit and publish.
 - Suggested starter questions.
 - **Example:** Acme pastes a connection string; the system drafts "Revenue = sum(amount)" and "Region"; the admin renames, fixes one guess and publishes.
